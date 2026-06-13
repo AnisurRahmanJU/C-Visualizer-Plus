@@ -27,7 +27,7 @@ const CoreTraceRepository = {
             { line: 5, bss: "Clean", data: "Empty", console: "Evaluating condition boundary: (count < 10) -> (9 < 10) -> TRUE.", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "count", val: "9" }] }], heap: [], vars: [{ name: "count", type: "int", scope: "main", val: "9" }], structures: null },
             { line: 6, bss: "Clean", data: "Empty", console: "Increment operational execution pass: count++ triggered.", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "count", val: "10" }] }], heap: [], vars: [{ name: "count", type: "int", scope: "main", val: "10" }], structures: null },
             { line: 5, bss: "Clean", data: "Empty", console: "Evaluating condition boundary: (count < 10) -> (10 < 10) -> FALSE. Halting loop context extraction.", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "count", val: "10" }] }], heap: [], vars: [{ name: "count", type: "int", scope: "main", val: "10" }], structures: null },
-            { line: 8, bss: "Clean", data: "Count: 10\\n", console: "STDOUT Standard Stream Commit: Count: 10", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "count", val: "10" }] }], heap: [], vars: [], structures: null },
+            { line: 8, bss: "Clean", data: "Count: 10\\n", console: "Output: Count: 10", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "count", val: "10" }] }], heap: [], vars: [], structures: null },
             { line: 9, bss: "Clean", data: "Empty", console: "Main routine popped. Application execution lifecycle finished.", stack: [], heap: [], vars: [], structures: null }
         ]
     },
@@ -56,7 +56,7 @@ const CoreTraceRepository = {
             { line: 5, bss: "Clean", data: "Empty", console: "Post-increment iteration index step: i updated to 10. Checking boundary condition (10 <= 10) -> TRUE.", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "sum", val: "45" }, { addr: "0x7FFF18", var: "i", val: "10" }] }], heap: [], vars: [{ name: "sum", type: "int", scope: "main", val: "45" }, { name: "i", type: "int", scope: "main", val: "10" }], structures: null },
             { line: 6, bss: "Clean", data: "Empty", console: "Adding index register step values: sum = 45 + 10 -> 55.", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "sum", val: "55" }, { addr: "0x7FFF18", var: "i", val: "10" }] }], heap: [], vars: [{ name: "sum", type: "int", scope: "main", val: "55" }], structures: null },
             { line: 5, bss: "Clean", data: "Empty", console: "Post-increment iteration index step: i updated to 11. Checking boundary condition (11 <= 10) -> FALSE. Exited Loop block.", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "sum", val: "55" }] }], heap: [], vars: [{ name: "sum", type: "int", scope: "main", val: "55" }], structures: null },
-            { line: 8, bss: "Clean", data: "Sum: 55\\n", console: "STDOUT Standard Stream Commit: Sum: 55", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "sum", val: "55" }] }], heap: [], vars: [], structures: null }
+            { line: 8, bss: "Clean", data: "Sum: 55\\n", console: "Output: Sum: 55", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "sum", val: "55" }] }], heap: [], vars: [], structures: null }
         ]
     },
     ex3: {
@@ -234,7 +234,7 @@ const CoreTraceRepository = {
             { line: 5, bss: "Clean", data: "Empty", console: "Collapsing stack layer frame level for fib(2): returns fib(1) + fib(0) -> 1 + 0 = 1.", stack: [{ name: "main()", addr: "0x7FFF00", locals: [] }, { name: "fib(10)", addr: "0x7FFF10", locals: [] }, { name: "fib(9)", addr: "0x7FFF20", locals: [] }, { name: "fib(8)", addr: "0x7FFF30", locals: [] }, { name: "fib(7)", addr: "0x7FFF40", locals: [] }, { name: "fib(6)", addr: "0x7FFF50", locals: [] }, { name: "fib(5)", addr: "0x7FFF60", locals: [] }, { name: "fib(4)", addr: "0x7FFF70", locals: [] }, { name: "fib(3)", addr: "0x7FFF80", locals: [] }], heap: [], vars: [], structures: null },
             { line: 5, bss: "Clean", data: "Empty", console: "[Simulated Aggressive Tree Trace Extraction Engine] Processing back-propagation return nodes layer maps. Cascading intermediate tree sums...", stack: [{ name: "main()", addr: "0x7FFF00", locals: [] }, { name: "fib(10)", addr: "0x7FFF10", locals: [] }], heap: [], vars: [], structures: null },
             { line: 5, bss: "Clean", data: "Empty", console: "Final recursive tree execution frame stack unwind phase: fib(10) returns full sequence calculation value = 55.", stack: [{ name: "main()", addr: "0x7FFF00", locals: [{ addr: "0x7FFF04", var: "r", val: "55" }] }], heap: [], vars: [{ name: "r", type: "int", scope: "main", val: "55" }], structures: null },
-            { line: 9, bss: "Clean", data: "Result: 55\\n", console: "STDOUT Standard Stream Commit: Result: 55", stack: [{ name: "main()", addr: "0x7FFF00", locals: [{ addr: "0x7FFF04", var: "r", val: "55" }] }], heap: [], vars: [], structures: null }
+            { line: 9, bss: "Clean", data: "Result: 55\\n", console: "Output: Result: 55", stack: [{ name: "main()", addr: "0x7FFF00", locals: [{ addr: "0x7FFF04", var: "r", val: "55" }] }], heap: [], vars: [], structures: null }
         ]
     },
 
@@ -275,7 +275,7 @@ const CoreTraceRepository = {
         steps: [
             { line: 4, bss: "Clean", data: "Empty", console: "Allocating framework terminal interface marker verification check value target checksum_val = 111.", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "checksum_val", val: "111" }] }], heap: [], vars: [{ name: "checksum_val", type: "int", scope: "main", val: "111" }], structures: null },
             { line: 5, bss: "Clean", data: "Empty", console: "Applying final modification rules tracking constraint segment checksum_val += 889 -> 1000.", stack: [{ name: "main()", addr: "0x7FFF10", locals: [{ addr: "0x7FFF14", var: "checksum_val", val: "1000" }] }], heap: [], vars: [{ name: "checksum_val", type: "int", scope: "main", val: "1000" }], structures: null },
-            { line: 6, bss: "Clean", data: "Checksum Completed: 1000\\n", console: "STDOUT Endpoint Release Stream Commit: Checksum Completed: 1000", stack: [{ name: "main()", addr: "0x7FFF10", locals: [] }], heap: [], vars: [], structures: null }
+            { line: 6, bss: "Clean", data: "Checksum Completed: 1000\\n", console: "Output: Checksum Completed: 1000", stack: [{ name: "main()", addr: "0x7FFF10", locals: [] }], heap: [], vars: [], structures: null }
         ]
     }
 };
