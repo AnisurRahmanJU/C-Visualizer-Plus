@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C Visualizer Plus</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="brand">
+            <span class="icon"></span>
+            <div>
+                <h1>C Visualizer Plus</h1>
+                <p>Step by Step Visualize C Code</p>
+            </div>
+        </div>
+        <div class="runtime-controls">
+            <select id="sample-selector" class="dropdown">
+                <optgroup label="1. Loops & Conditions">
+                    <option value="ex1" selected>1. Loop Counting</option>
+                    <option value="ex2">2. Loop Summation</option>
+                    <option value="ex3">3. Loop Multiplication</option>
+                    <option value="ex4">4. If-Else Branching</option>
+                </optgroup>
+                <optgroup label="2. Arrays & Buffers">
+                    <option value="ex5">5. Array Updation</option>
+                    <option value="ex6">6. Array Accessing</option>
+                    <option value="ex7">7. String Mutation</option>
+                    <option value="ex8">8. Array Pointering</option>
+                </optgroup>
+                <optgroup label="3. Structure & String">
+                    <option value="ex9">9. Structure Init</option>
+                    <option value="ex10">10. Structure Update</option>
+                    <option value="ex11">11. Structure Copy</option>
+                    <option value="ex12">12. String Copy</option>
+                </optgroup>
+                <optgroup label="4. Memory & Pointer">
+                    <option value="ex13">13. Memory Allocation</option>
+                    <option value="ex14">14. Double Pointring</option>
+                    <option value="ex15">15. Pointer Function</option>
+                    <option value="ex16">16. Value Swapping</option>
+                </optgroup>
+                <optgroup label="5. Function & Others">
+                    <option value="ex17">17. Switch Case Condition</option>
+                    <option value="ex18">18. Recursive Fibonacci</option>
+                    <option value="ex19">19. Accumulator Loop</option>
+                    <option value="ex20">20. Checksum Calculation</option>
+                </optgroup>
+            </select>
+            <button id="btn-run" class="btn success">▶️ Compile</button>
+            <button id="btn-step" class="btn primary" disabled>➡️ Step</button>
+            <button id="btn-reset" class="btn danger">🔄 Reset</button>
+        </div>
+    </header>
+    <main class="app-workspace">
+        <section class="workspace-panel ide-panel">
+            <div class="panel-bar">
+                <span>📄 main.c</span>
+                <span class="status-badge" id="engine-status">Idle</span>
+            </div>
+            <div class="editor-container"><textarea id="c-editor"></textarea></div>
+            <div class="panel-bar console-bar">📟 Standard Output (stdout)</div>
+            <div id="terminal" class="terminal-view">
+                <div class="sys-ln">Awaiting compilation parsing framework mapping tracks...</div>
+            </div>
+        </section>
+        <section class="workspace-panel viz-panel">
+            <div class="viz-sub-row grid-2">
+                <div class="viz-card">
+                    <div class="card-header">🔍 Active Variable Value Trace</div>
+                    <div class="card-body scrollable">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>Variable</th><th>Type</th><th>Scope Frame</th><th>Value</th></tr>
+                            </thead>
+                            <tbody id="var-trace-table">
+                                <tr><td colspan="4" class="empty">No active scalar variables tracked.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="viz-card">
+                    <div class="card-header">📊 Memory Layout Structure (Arrays/Strings)</div>
+                    <div class="card-body flex-center" id="structure-visualization">
+                        <div class="empty-state">No continuous block structure loaded.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="viz-sub-row grid-3-segment">
+                <div class="viz-card segment-card stack-seg">
+                    <div class="card-header stack-hdr">🥞 Call Stack Frames (High Addr)</div>
+                    <div class="card-body segment-body" id="stack-frame-container"><div class="empty-state">Stack Empty</div></div>
+                </div>
+                <div class="viz-card segment-card heap-seg">
+                    <div class="card-header heap-hdr">💎 Dynamic Heap Memory (Low Addr)</div>
+                    <div class="card-body segment-body" id="heap-frame-container"><div class="empty-state">Heap Unallocated</div></div>
+                </div>
+                <div class="viz-card segment-card static-seg">
+                    <div class="card-header static-hdr">💾 Static Global & Text Segments</div>
+                    <div class="card-body segment-body">
+                        <div class="static-row"><span class="addr">0x0040B000</span> <span class="lbl">.text:</span> <span class="val">Instructions</span></div>
+                        <div class="static-row"><span class="addr">0x0040A000</span> <span class="lbl">.data:</span> <span class="val" id="data-seg-val">Empty</span></div>
+                        <div class="static-row"><span class="addr">0x00409000</span> <span class="lbl">.bss:</span> <span class="val" id="bss-seg-val">Clean Block</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer class="app-footer">
+        <p>Contact: <a href="mailto:poetanis@gmail.com">poetanis@gmail.com</a> | All rights reserved by <a href="https://programming24.school.blog" target="_blank">Programming24 School</a> | Developer: <a href="https://www.grameenphone.academy/public-profile/GP153876" target="_blank">Md. Anisur Rahman</a> | <a href="https://github.com/AnisurRahmanJU/C-Visualizer-Plus" target="_blank">GitHub Repository</a></p>
+    </footer>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
