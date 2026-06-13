@@ -324,7 +324,7 @@ document.addEventListener("DOMContentLoaded", () => {
             theme: "dracula",
             lineNumbers: true,
             matchBrackets: true,
-            readOnly: false
+            readOnly: true,
         });
     }
 
