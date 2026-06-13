@@ -494,16 +494,20 @@ function rebuildConsoleOutputLog() {
     if (!consoleBox) return;
 
     let updatedHTML = compilationBaseHTML;
-    // বর্তমান ইণ্ডেক্স পর্যন্ত যতগুলো নেক্সট স্টেপ নেওয়া হয়েছিল, শুধু সেগুলোই প্রিন্ট হবে
+    // বর্তমান ইণ্ডেক্স পর্যন্ত যতগুলো নেক্সট স্টেপ নেওয়া হয়েছিল, শুধু সেগুলোই প্রিন্ট হবে
     for (let i = 0; i <= currentTraceIndex; i++) {
         if (activeStepsList[i]) {
-            updatedHTML += `<div>🚀 [Line ${activeStepsList[i].line}]: ${activeStepsList[i].console}</div>`;
+            // ব্যাক ট্র্যাকিং এর সময়ও printf এর রিয়েল আউটপুট স্টাইল ঠিক রাখার লজিক
+            if (activeStepsList[i].console.toLowerCase().includes("printf") || activeStepsList[i].console.startsWith("Output:")) {
+                updatedHTML += `<div style="color:#50fa7b; font-family:monospace; padding-left:10px;">💾 ${activeStepsList[i].console}</div>`;
+            } else {
+                updatedHTML += `<div>🚀 [Line ${activeStepsList[i].line}]: ${activeStepsList[i].console}</div>`;
+            }
         }
     }
     consoleBox.innerHTML = updatedHTML;
     consoleBox.scrollTop = consoleBox.scrollHeight;
 }
-
 // কোডের লাইনে হাইলাইট এবং ইউজার ইন্টারফেস আপডেট করার কমন ফাংশন
 function applyTraceStepVisuals(index, isForward) {
     const currentStepPayload = activeStepsList[index];
@@ -517,9 +521,14 @@ function applyTraceStepVisuals(index, isForward) {
 
     if (!currentStepPayload) return;
 
-    // শুধুমাত্র সামনের দিকে যাওয়ার সময় টার্মিনালে নতুন লাইন পুশ হবে
+    // শুধুমাত্র সামনের দিকে যাওয়ার সময় টার্মিনালে নতুন লাইন পুশ হবে
     if (isForward && consoleBox) {
-        consoleBox.innerHTML += `<div>🚀 [Line ${currentStepPayload.line}]: ${currentStepPayload.console}</div>`;
+        // যদি কনসোল মেসেজটি printf এর হয় বা Output ধারণ করে
+        if (currentStepPayload.console.toLowerCase().includes("printf") || currentStepPayload.console.startsWith("Output:")) {
+            consoleBox.innerHTML += `<div style="color:#50fa7b; font-family:monospace; padding-left:10px;">💾 ${currentStepPayload.console}</div>`;
+        } else {
+            consoleBox.innerHTML += `<div>🚀 [Line ${currentStepPayload.line}]: ${currentStepPayload.console}</div>`;
+        }
         consoleBox.scrollTop = consoleBox.scrollHeight;
     }
 
