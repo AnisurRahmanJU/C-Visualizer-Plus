@@ -1,10 +1,77 @@
-
 'use strict';
 
 const SAMPLES = {
+memory_layout:`#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+char value_global_init[] = "Global Init";
+char value_global_uninit[15];
+
+void show_static_and_stack();
+
+int main() {
+    char *value_heap_malloc;
+    char *value_heap_calloc;
+    char *value_heap_realloc;
+
+    value_heap_malloc = (char*)malloc(30 * sizeof(char));
+    if (value_heap_malloc == NULL) {
+        printf("Heap part - malloc: Allocation failed\\n");
+        return 1;
+    }
+    strcpy(value_heap_malloc, "Dynamically allocated string.");
+    printf("Heap part - malloc: %s\\n", value_heap_malloc);
+
+    value_heap_calloc = (char*)calloc(30, sizeof(char));
+    if (value_heap_calloc == NULL) {
+        printf("Heap part - calloc: Allocation failed\\n");
+        free(value_heap_malloc);
+        return 1;
+    }
+    strcpy(value_heap_calloc, value_heap_malloc);
+    printf("Heap part - calloc: %s\\n", value_heap_calloc);
+
+    value_heap_realloc = (char*)realloc(value_heap_calloc, 60 * sizeof(char));
+    if (value_heap_realloc == NULL) {
+        printf("Heap part - realloc: Allocation failed\\n");
+        free(value_heap_calloc);
+        free(value_heap_malloc);
+        return 1;
+    }
+    strcat(value_heap_realloc, " With more reallocated content");
+    printf("Heap part - realloc: %s\\n", value_heap_realloc);
+
+    strcpy(value_global_uninit, "Global Uninit");
+    printf("Global part - Initialized: %s\\n", value_global_init);
+    printf("Global part - Uninitialized (BSS): %s\\n", value_global_uninit);
+
+    show_static_and_stack();
+
+    printf("Text part: main() and show_static_and_stack() are in the Text segment.\\n");
+
+    free(value_heap_malloc);
+    free(value_heap_realloc);
+    return 0;
+}
+
+void show_static_and_stack() {
+    static char value_static_init[] = "Static Init";
+    static char value_static_uninit[15];
+    strcpy(value_static_uninit, "Static Uninit");
+
+    char value_stack[] = "Stack Var";
+    printf("Stack part: %s\\n", value_stack);
+    printf("Static part - Initialized (Data): %s\\n", value_static_init);
+    printf("Static part - Uninitialized (BSS): %s\\n", value_static_uninit);
+}`,
 all_topics:`#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+/* ── A long tour through C: types, control flow, functions,
+   recursion, arrays, 2D arrays, strings, structs, pointers
+   and dynamic memory — all in one program. ── */
 
 struct Point {
     int x;
@@ -28,24 +95,24 @@ void scaleArray(int *arr, int len, int factor) {
 }
 
 int main() {
-  
+    /* 1. Basic types */
     int   age    = 30;
     float pi     = 3.14f;
     char  grade  = 'A';
     double e     = 2.71828;
     printf("age=%d pi=%.2f grade=%c e=%.5f\\n", age, pi, grade, e);
 
-   
+    /* 2. Arithmetic */
     int a = 17, b = 5;
     printf("%d+%d=%d  %d%%%d=%d\\n", a, b, a + b, a, b, a % b);
 
-   
+    /* 3. Control flow */
     int score = 82;
     if (score >= 90) printf("Grade: A\\n");
     else if (score >= 80) printf("Grade: B\\n");
     else printf("Grade: C or below\\n");
 
-   
+    /* 4. For loop + while loop */
     int sum = 0, i;
     for (i = 1; i <= 5; i++) sum += i;
     printf("sum 1..5 = %d\\n", sum);
@@ -56,7 +123,7 @@ int main() {
         n--;
     }
 
-   
+    /* 5. Switch */
     int day = 2;
     switch (day) {
         case 1: printf("Mon\\n"); break;
@@ -64,18 +131,18 @@ int main() {
         default: printf("Other\\n");
     }
 
-   
+    /* 6. Functions + recursion */
     int s = add(4, 9);
     int f = factorial(5);
     printf("add=%d factorial(5)=%d\\n", s, f);
 
-   
+    /* 7. 1D array */
     int nums[5] = {10, 20, 30, 40, 50};
     int total = 0;
     for (i = 0; i < 5; i++) total += nums[i];
     printf("array total=%d\\n", total);
 
-   
+    /* 8. 2D array */
     int grid[2][3] = {{1, 2, 3}, {4, 5, 6}};
     int gridSum = 0;
     int r, c;
@@ -87,28 +154,28 @@ int main() {
     }
     printf("grid sum=%d, grid[1][2] after doubling=%d\\n", gridSum, grid[1][2]);
 
-  
+    /* 9. Strings */
     char name[] = "Visualizer";
     printf("name=%s length=%d\\n", name, (int)strlen(name));
 
-    
+    /* 10. Structs */
     struct Point p1;
     p1.x = 3;
     p1.y = 4;
     printf("point=(%d,%d)\\n", p1.x, p1.y);
 
-  
+    /* 11. Pointers */
     int target = 99;
     int *ptr = &target;
     *ptr = 100;
     printf("target via pointer=%d\\n", target);
 
-   
+    /* 12. Pointer + array (pass array to function) */
     int small[3] = {1, 2, 3};
     scaleArray(small, 3, 10);
     printf("scaled: %d %d %d\\n", small[0], small[1], small[2]);
 
-   
+    /* 13. Dynamic memory */
     int *heapArr = (int*)malloc(4 * sizeof(int));
     for (i = 0; i < 4; i++) heapArr[i] = i * i;
     printf("heap: %d %d %d %d\\n", heapArr[0], heapArr[1], heapArr[2], heapArr[3]);
@@ -444,6 +511,7 @@ class CInterpreter {
     this.globals = {};
     this._globalFrame = { name:'[Global]', vars:{}, isGlobal:true };
     this._callStack = [];
+    this._staticStore = {};
     this.output = '';
     try { this._tokenize(); this._buildAST(); this._initGlobals(); this._run(); }
     catch(e) { this.errors.push(e.message || String(e)); }
@@ -573,6 +641,12 @@ class CInterpreter {
     if(t.v==='continue'){this._nx();if(this._pk().v===';')this._nx();return{type:'continue',ln:t.ln};}
     if(t.t==='pp'){this._nx();return null;}
     if(t.v===';'){this._nx();return null;}
+    if(t.v==='static'){
+      this._nx();
+      const d=this._parseDecl();
+      d.isStatic=true;
+      return d;
+    }
     if(t.v==='struct'||this._isType(t.v)){
       const save=this._ti;
       try {
@@ -732,7 +806,7 @@ class CInterpreter {
       } else {
         val=g.init?this._eval(g.init,this._globalFrame):0;
       }
-      this._globalFrame.vars[name]={type:g.type,value:val,addr:this._nextAddr()};
+      this._globalFrame.vars[name]={type:g.type,value:val,addr:this._nextAddr(),seg:g.init?'data':'bss'};
     }
   }
   _flattenInit(node,frame){
@@ -754,7 +828,7 @@ class CInterpreter {
     const fn=this.functions[name];
     if(!fn)throw new Error('Undefined function: '+name+(callSite?.ln?(' (line '+callSite.ln+')'):''));
     const frame={name,vars:{},retVal:undefined};
-    fn.params.forEach((p,i)=>{frame.vars[p.name]={type:p.type,value:args[i]??0,addr:this._nextAddr(),isParam:true};});
+    fn.params.forEach((p,i)=>{frame.vars[p.name]={type:p.type,value:args[i]??0,addr:this._nextAddr(),isParam:true,seg:'stack'};});
     this._callStack.push(frame);
     if(this._callStack.length>200) throw new Error('Stack overflow — possible infinite recursion in '+name+'()');
     this._addStep({ln:fn.line||1,desc:`Called <b>${name}(${args.map(a=>this._fv(a)).join(', ')})</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
@@ -783,9 +857,16 @@ class CInterpreter {
     }
   }
 
-  _execDecl(s,frame){
+ _execDecl(s,frame){
     for(const d of s.decls){
       let val;const vt=s.varType;
+      if(s.isStatic){
+        const key=frame.name+'::'+d.name;
+        if(this._staticStore[key]){
+          frame.vars[d.name]=this._staticStore[key];
+          continue;
+        }
+      }
       if(d.isArr){
         const sz=d.arrSize?this._eval(d.arrSize,frame):0;
         if(d.init){val=this._flattenInit(d.init,frame);}
@@ -797,8 +878,12 @@ class CInterpreter {
       } else {
         val=d.init?(d.init.type==='arrlit'?this._flattenInit(d.init,frame):this._eval(d.init,frame)):0;
       }
-      frame.vars[d.name]={type:vt,value:val,addr:this._nextAddr(),changed:true};
-      this._addStep({ln:s.ln,desc:`Declare <code>${vt} ${d.name}</code>${d.init?` = <b>${this._fv(val)}</b>`:''}`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d.name});
+      const entry={type:vt,value:val,addr:this._nextAddr(),changed:true,seg:s.isStatic?'static':'stack'};
+      frame.vars[d.name]=entry;
+      if(s.isStatic) this._staticStore[frame.name+'::'+d.name]=entry;
+
+      // --- CHANGE THIS LINE TO PASS vt ---
+      this._addStep({ln:s.ln,desc:`Declare <code>${s.isStatic?'static ':''}${vt} ${d.name}</code>${d.init?` = <b>${this._fv(val, vt)}</b>`:''}`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d.name});
       frame.vars[d.name].changed=false;
     }
   }
@@ -899,7 +984,7 @@ class CInterpreter {
         const ref=this._lval(e.x,frame);if(!ref)return 0;
         const old=ref.get();ref.set(e.op==='++'?old+1:old-1);return old;
       }
-      case 'cast': return this._castVal(this._eval(e.x,frame),e.ct);
+      case 'cast': { const prevHint=this._lastCastType; this._lastCastType=e.ct; const rv=this._castVal(this._eval(e.x,frame),e.ct); this._lastCastType=prevHint; return rv; }
       case 'addr': {
         return this._addrOf(e.x,frame);
       }
@@ -1064,31 +1149,86 @@ class CInterpreter {
       case 'printf':  return this._printf(args,e.fn);
       case 'scanf':   return this._scanf(args,e.fn,frame);
       case 'sprintf': {const fmt=args[1]||'';const out=this._sprintfFmt(fmt,args.slice(2));return out.length;}
-      case 'strlen':  {const s=args[0];if(Array.isArray(s)){const z=s.indexOf(0);return z<0?s.length:z;}return typeof s==='string'?s.length:0;}
-      case 'strcpy':case 'strncpy':return args[1];
-      case 'strcat':return args[0];
-      case 'strcmp':  return typeof args[0]==='string'&&typeof args[1]==='string'?(args[0]<args[1]?-1:args[0]>args[1]?1:0):0;
+      case 'strlen':  return this._cstrLen(args[0]);
+      case 'strcpy':case 'strncpy':{
+        let s = this._readCString(args[1]);
+        if(fnName==='strncpy'&&args[2]!==undefined) s=s.slice(0,args[2]);
+        this._writeCString(args[0], s);
+        return args[0];
+      }
+      case 'strcat':case 'strncat':{
+        const destLen=this._cstrLen(args[0]);
+        let s=this._readCString(args[1]);
+        if(fnName==='strncat'&&args[2]!==undefined) s=s.slice(0,args[2]);
+        this._writeCString(args[0], s, destLen);
+        return args[0];
+      }
+      case 'strcmp':case 'strncmp':{
+        let a=this._readCString(args[0]), b=this._readCString(args[1]);
+        if(fnName==='strncmp'&&args[2]!==undefined){a=a.slice(0,args[2]);b=b.slice(0,args[2]);}
+        return a<b?-1:a>b?1:0;
+      }
       case 'toupper': return typeof args[0]==='number'?String.fromCharCode(args[0]).toUpperCase().charCodeAt(0):args[0];
       case 'tolower': return typeof args[0]==='number'?String.fromCharCode(args[0]).toLowerCase().charCodeAt(0):args[0];
       case 'isdigit': return (args[0]>=48&&args[0]<=57)?1:0;
       case 'isalpha': return ((args[0]>=65&&args[0]<=90)||(args[0]>=97&&args[0]<=122))?1:0;
       case 'malloc':case 'calloc': {
         const sz=fnName==='calloc'?args[0]*args[1]:args[0];
-        const addr=this._heapAddr();this._heap[addr]={size:sz,data:{},arr:new Array(Math.max(1,Math.floor(sz/4))).fill(0)};
+        const isChar=(this._lastCastType||'').includes('char');
+        const elemLen=isChar?Math.max(1,sz):Math.max(1,Math.floor(sz/4)||sz);
+        const addr=this._heapAddr();
+        this._heap[addr]={size:sz,data:{},arr:new Array(elemLen).fill(0),isChar};
         this._addStep({ln:e.fn.ln||1,desc:`<code>${fnName}(${sz})</code> &rarr; allocated at heap <b>${addr}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
         return addr;
+      }
+      case 'realloc': {
+        const oldPtr=args[0], newSize=args[1];
+        const old=this._heap[oldPtr];
+        const isChar=old?old.isChar:(this._lastCastType||'').includes('char');
+        const newElemLen=isChar?Math.max(1,newSize):Math.max(1,Math.floor(newSize/4)||newSize);
+        const newAddr=this._heapAddr();
+        const newArr=new Array(newElemLen).fill(0);
+        if(old&&old.arr){ for(let i=0;i<Math.min(old.arr.length,newArr.length);i++) newArr[i]=old.arr[i]; }
+        this._heap[newAddr]={size:newSize,data:{},arr:newArr,isChar};
+        if(old) delete this._heap[oldPtr];
+        this._addStep({ln:e.fn.ln||1,desc:`<code>realloc(${oldPtr}, ${newSize})</code> &rarr; moved/resized to heap <b>${newAddr}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+        return newAddr;
       }
       case 'free': {
         const addr=args[0];if(addr&&this._heap[addr]){delete this._heap[addr];
         this._addStep({ln:e.fn.ln||1,desc:`<code>free(${addr})</code> &mdash; memory released`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});}
         return null;
       }
-      case 'abs':case 'fabs':return Math.abs(args[0]);
+      case 'abs':case 'fabs':case 'labs':return Math.abs(args[0]);
       case 'sqrt':return Math.sqrt(args[0]);
+      case 'cbrt':return Math.cbrt(args[0]);
       case 'pow':return Math.pow(args[0],args[1]);
       case 'floor':return Math.floor(args[0]);
       case 'ceil':return Math.ceil(args[0]);
       case 'round':return Math.round(args[0]);
+      case 'trunc':return Math.trunc(args[0]);
+      case 'fmod':return args[1]?args[0]%args[1]:0;
+      case 'fmin':return Math.min(args[0],args[1]);
+      case 'fmax':return Math.max(args[0],args[1]);
+      case 'hypot':return Math.hypot(args[0],args[1]);
+      case 'exp':return Math.exp(args[0]);
+      case 'exp2':return Math.pow(2,args[0]);
+      case 'log':return Math.log(args[0]);
+      case 'log2':return Math.log2(args[0]);
+      case 'log10':return Math.log10(args[0]);
+      case 'sin':return Math.sin(args[0]);
+      case 'cos':return Math.cos(args[0]);
+      case 'tan':return Math.tan(args[0]);
+      case 'asin':return Math.asin(args[0]);
+      case 'acos':return Math.acos(args[0]);
+      case 'atan':return Math.atan(args[0]);
+      case 'atan2':return Math.atan2(args[0],args[1]);
+      case 'sinh':return Math.sinh(args[0]);
+      case 'cosh':return Math.cosh(args[0]);
+      case 'tanh':return Math.tanh(args[0]);
+      case 'asinh':return Math.asinh(args[0]);
+      case 'acosh':return Math.acosh(args[0]);
+      case 'atanh':return Math.atanh(args[0]);
       case 'rand':return Math.floor(Math.random()*32768);
       case 'srand':return 0;
       case 'atoi':return parseInt(args[0])||0;
@@ -1142,7 +1282,7 @@ class CInterpreter {
         else if(sp==='g'||sp==='G')r+=parseFloat((Number(v||0)).toPrecision(pr||6)).toString();
         else if(sp==='e')r+=(Number(v||0)).toExponential(pr?parseInt(pr):6);
         else if(sp==='c')r+=v===undefined?'':String.fromCharCode(Number(v));
-        else if(sp==='s'){let s=v===null?'(null)':(Array.isArray(v)?v.filter(c=>c>0).map(c=>String.fromCharCode(c)).join(''):String(v===undefined?'':v));r+=s;}
+        else if(sp==='s'){let s=v===null?'(null)':this._readCString(v);r+=s;}
         else if(sp==='p')r+=v===null?'0x0':String(v);
         else if(sp==='%')r+='%';
         else r+='%'+sp;
@@ -1154,6 +1294,35 @@ class CInterpreter {
   }
 
   _castVal(v,t){if(t.includes('*'))return v;if(t.includes('int')||t.includes('char'))return Math.trunc(Number(v)||0);if(t.includes('float')||t.includes('double'))return Number(v)||0;return v;}
+  _resolveBuffer(target){
+    if(Array.isArray(target)) return target;
+    if(typeof target==='string' && this._heap[target]) return this._heap[target].arr;
+    return null;
+  }
+  _readCString(target){
+    if(typeof target==='string' && !this._heap[target]) return target;
+    const buf=this._resolveBuffer(target);
+    if(!buf) return '';
+    let s='';
+    for(let i=0;i<buf.length;i++){ if(buf[i]===0) break; s+=String.fromCharCode(buf[i]); }
+    return s;
+  }
+  _cstrLen(target){
+    if(typeof target==='string' && !this._heap[target]) return target.length;
+    const buf=this._resolveBuffer(target);
+    if(!buf) return 0;
+    let i=0; while(i<buf.length && buf[i]!==0) i++;
+    return i;
+  }
+  _writeCString(target, str, offset){
+    offset = offset||0;
+    const buf=this._resolveBuffer(target);
+    if(!buf) return;
+    for(let i=0;i<str.length;i++){ buf[offset+i]=str.charCodeAt(i); }
+    const end=offset+str.length;
+    if(end<buf.length) buf[end]=0; else buf.push(0);
+    if(typeof target==='string' && this._heap[target]) this._heap[target].data['text']=this._readCString(target);
+  }
   _szType(t){if(t.includes('char'))return 1;if(t.includes('short'))return 2;if(t.includes('int')||t.includes('float'))return 4;if(t.includes('double')||t.includes('long'))return 8;if(t.includes('*'))return 8;return 4;}
   _szOf(v){if(Array.isArray(v))return v.length*4;return 4;}
   _fv(v){if(v===null)return'NULL';if(Array.isArray(v))return'['+v.slice(0,6).map(x=>Array.isArray(x)?'['+x.slice(0,4).join(',')+']':x).join(', ')+(v.length>6?'&hellip;':'')+']';if(typeof v==='object')return JSON.stringify(v);return String(v);}
@@ -1172,7 +1341,7 @@ class CInterpreter {
     return fs;
   }
   _deepCopy(v){ if(Array.isArray(v)) return v.map(x=>this._deepCopy(x)); if(v&&typeof v==='object') return {...v}; return v; }
-  _snapHeap(){const h={};for(const[k,v]of Object.entries(this._heap))h[k]={size:v.size,data:{...v.data}};return h;}
+  _snapHeap(){const h={};for(const[k,v]of Object.entries(this._heap))h[k]={size:v.size,data:{...v.data},arr:v.arr?v.arr.slice():[],isChar:!!v.isChar};return h;}
   _addStep(s){if(this.steps.length<800)this.steps.push(s);}
 }
 
@@ -1213,7 +1382,7 @@ const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), 
   lineWrapping: false,
   scrollbarStyle: 'native'
 });
-cmEditor.setValue(SAMPLES.all_topics);
+cmEditor.setValue(SAMPLES.memory_layout);
 cmEditor.setSize('100%', '100%');
 
 const $ = id => document.getElementById(id);
@@ -1404,6 +1573,37 @@ function showWalk(type, html) {
   walkEl.innerHTML = html;
 }
 
+function toBinaryStr(val, type) {
+  if (typeof val !== 'number' || !Number.isFinite(val)) return '—';
+  const t = type || '';
+  let bits = 32;
+  if (t.includes('char')) bits = 8;
+  else if (t.includes('short')) bits = 16;
+  else if (t.includes('long') || t.includes('double')) bits = 32; // display capped at 32 for readability
+  let n = Math.trunc(val);
+  if (n < 0) n = (Math.pow(2, bits) + n) >>> 0;
+  let s = (n >>> 0).toString(2);
+  if (s.length > bits) s = s.slice(-bits);
+  while (s.length < bits) s = '0' + s;
+  return s.replace(/(.{4})/g, '$1 ').trim();
+}
+function segBadge(seg) {
+  if (!seg) return '';
+  const labels = { data: 'Data', bss: 'BSS', heap: 'Heap', stack: 'Stack', static: 'Static' };
+  return `<span class="seg-badge ${seg}">${labels[seg] || seg}</span>`;
+}
+function buildArrCellsHtml(val, type, isChar) {
+  const charMode = isChar || (type && type.includes('char'));
+  let html = '<div class="arr-row">';
+  val.forEach((c, ci) => {
+    const num = Number(c) || 0;
+    const glyph = charMode ? (num === 0 ? '\\\\0' : (num >= 32 && num < 127 ? String.fromCharCode(num) : '·')) : String(num);
+    html += `<div class="arr-cell" title="dec:${num} bin:${toBinaryStr(num, charMode ? 'char' : 'int')}">${String(glyph).replace(/</g,'&lt;')}<span class="ac-bin">${toBinaryStr(num, charMode ? 'char' : 'int')}</span></div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
 function renderFrames(frames, chg) {
   if (!frames || !frames.length) {
     framesEl.innerHTML = '<div class="empty"><i class="fa-solid fa-box-open"></i><p>No stack frames yet. Run the visualizer to see variables.</p></div>';
@@ -1432,7 +1632,7 @@ function renderFrames(frames, chg) {
     } else {
       const tbl = document.createElement('table');
       tbl.className = 'vtbl';
-      tbl.innerHTML = `<thead><tr><th>Name</th><th class="col-type">Type</th><th>Value</th><th class="col-addr">Address</th></tr></thead>`;
+      tbl.innerHTML = `<thead><tr><th>Name</th><th class="col-type">Type</th><th>Value</th><th>Binary</th><th class="col-addr">Address</th></tr></thead>`;
       const tb = document.createElement('tbody');
 
       for (const [name, v] of entries) {
@@ -1444,47 +1644,65 @@ function renderFrames(frames, chg) {
         const isPtr = v.type && v.type.includes('*') && !Array.isArray(val);
         const isArr = Array.isArray(val);
 
-        let vhtml;
+        let vhtml, binHtml = '<span class="vbin">—</span>';
         if (isArr) {
           const is2D = val.length > 0 && Array.isArray(val[0]);
           if (is2D) {
             vhtml = '<div style="display:flex;flex-direction:column;gap:3px">';
-            val.forEach((row, ri) => {
-              vhtml += `<div class="arr-row">`;
-              row.slice(0, 12).forEach((c, ci) => {
-                vhtml += `<div class="arr-cell">${c}<span class="arr-idx">${ri},${ci}</span></div>`;
-              });
-              vhtml += `</div>`;
+            val.forEach((row) => {
+              vhtml += buildArrCellsHtml(row, v.type, false);
             });
             vhtml += '</div>';
           } else {
-            vhtml = `<div class="arr-row">`;
-            val.slice(0, 14).forEach((c, ci) => {
-              const d = (v.type && v.type.includes('char') && c > 0)
-                ? String.fromCharCode(c)
-                : (c === 0 && v.type && v.type.includes('char') ? '\\0' : c);
-              vhtml += `<div class="arr-cell">${String(d).replace(/</g,'&lt;')}<span class="arr-idx">${ci}</span></div>`;
-            });
-            if (val.length > 14) vhtml += `<div class="arr-cell" style="color:var(--text3);border-style:dashed">&hellip;</div>`;
-            vhtml += `</div>`;
+            vhtml = buildArrCellsHtml(val, v.type, v.type && v.type.includes('char'));
           }
         } else if (val && typeof val === 'object' && !Array.isArray(val)) {
           vhtml = `<span style="color:var(--text2);font-size:11.5px">{${Object.entries(val).map(([k2,v2])=>`${k2}: ${v2}`).join(', ')}}</span>`;
         } else if (isPtr) {
           vhtml = `<span class="vv vptr"><i class="fa-solid fa-link" style="font-size:10px"></i> ${val || 'NULL'}</span>`;
         } else {
-          const d = val === null ? 'NULL' : (typeof val === 'string' ? `"${val}"` : String(val ?? 0));
-          vhtml = `<span class="vv${isChanged ? ' vc' : ''}">${d.replace(/</g,'&lt;')}</span>`;
-        }
+    let d;
+
+    if (val === null) {
+        d = "NULL";
+    }
+    else if (typeof val === "string") {
+        d = `"${val}"`;
+    }
+    else if (v.type && v.type.includes("char") && typeof val === "number") {
+        if (val === 0)
+            d = "'\\0'";
+        else if (val >= 32 && val <= 126)
+            d = `'${String.fromCharCode(val)}'`;
+        else
+            d = `'\\x${val.toString(16).padStart(2, "0")}'`;
+
+        // KEEP THE BINARY COLUMN
+        binHtml = `<span class="vbin">${toBinaryStr(val, "char")}</span>`;
+    }
+    else {
+        d = String(val ?? 0);
+
+        if (typeof val === "number")
+            binHtml = `<span class="vbin">${toBinaryStr(val, v.type)}</span>`;
+    }
+
+    vhtml = `<span class="vv${isChanged ? ' vc' : ''}">${d.replace(/</g,'&lt;')}</span>`;
+}
 
         tr.innerHTML = `
-          <td><span class="vn">${name}</span></td>
+          <td><span class="vn">${name}</span>${segBadge(v.seg)}</td>
           <td class="col-type"><span class="vt">${(v.type || '').replace(/</g,'&lt;')}</span></td>
           <td>${vhtml}</td>
+          <td>${binHtml}</td>
           <td class="col-addr"><span class="vaddr">${v.addr || ''}</span></td>`;
         tb.appendChild(tr);
       }
-      tbl.appendChild(tb); card.appendChild(tbl);
+      tbl.appendChild(tb);
+      const tblWrap = document.createElement('div');
+      tblWrap.className = 'vtbl-wrap';
+      tblWrap.appendChild(tbl);
+      card.appendChild(tblWrap);
     }
     framesEl.appendChild(card);
   }
@@ -1496,10 +1714,16 @@ function renderHeap(heap) {
   heapBlocks.innerHTML = '';
   for (const [addr, block] of Object.entries(heap)) {
     const d = document.createElement('div'); d.className = 'heap-block';
-    const data = Object.entries(block.data).length
-      ? Object.entries(block.data).map(([k, v]) => `[${k}]=${v}`).join(', ')
-      : 'allocated';
-    d.innerHTML = `<i class="fa-solid fa-microchip" style="color:var(--vsc-orange);font-size:11px"></i><span class="h-addr">${addr}</span><span class="h-sz">${block.size} bytes</span><span class="h-data">${data}</span>`;
+    const head = document.createElement('div');
+    head.className = 'hb-head';
+    head.innerHTML = `<i class="fa-solid fa-microchip" style="color:var(--vsc-orange);font-size:11px"></i><span class="h-addr">${addr}</span><span class="h-sz">${block.size} bytes</span>${segBadge('heap')}<span class="h-sz">${block.isChar ? 'char buffer' : 'numeric buffer'}</span>`;
+    d.appendChild(head);
+    if (block.arr && block.arr.length) {
+      const body = document.createElement('div');
+      body.className = 'hb-body';
+      body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar);
+      d.appendChild(body);
+    }
     heapBlocks.appendChild(d);
   }
 }
