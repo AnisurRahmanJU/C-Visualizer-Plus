@@ -28,24 +28,24 @@ void scaleArray(int *arr, int len, int factor) {
 }
 
 int main() {
-    /* 1. Basic types */
+  
     int   age    = 30;
     float pi     = 3.14f;
     char  grade  = 'A';
     double e     = 2.71828;
     printf("age=%d pi=%.2f grade=%c e=%.5f\\n", age, pi, grade, e);
 
-    /* 2. Arithmetic */
+   
     int a = 17, b = 5;
     printf("%d+%d=%d  %d%%%d=%d\\n", a, b, a + b, a, b, a % b);
 
-    /* 3. Control flow */
+   
     int score = 82;
     if (score >= 90) printf("Grade: A\\n");
     else if (score >= 80) printf("Grade: B\\n");
     else printf("Grade: C or below\\n");
 
-    /* 4. For loop + while loop */
+   
     int sum = 0, i;
     for (i = 1; i <= 5; i++) sum += i;
     printf("sum 1..5 = %d\\n", sum);
@@ -56,7 +56,7 @@ int main() {
         n--;
     }
 
-    /* 5. Switch */
+   
     int day = 2;
     switch (day) {
         case 1: printf("Mon\\n"); break;
@@ -64,18 +64,18 @@ int main() {
         default: printf("Other\\n");
     }
 
-    /* 6. Functions + recursion */
+   
     int s = add(4, 9);
     int f = factorial(5);
     printf("add=%d factorial(5)=%d\\n", s, f);
 
-    /* 7. 1D array */
+   
     int nums[5] = {10, 20, 30, 40, 50};
     int total = 0;
     for (i = 0; i < 5; i++) total += nums[i];
     printf("array total=%d\\n", total);
 
-    /* 8. 2D array */
+   
     int grid[2][3] = {{1, 2, 3}, {4, 5, 6}};
     int gridSum = 0;
     int r, c;
@@ -87,28 +87,28 @@ int main() {
     }
     printf("grid sum=%d, grid[1][2] after doubling=%d\\n", gridSum, grid[1][2]);
 
-    /* 9. Strings */
+  
     char name[] = "Visualizer";
     printf("name=%s length=%d\\n", name, (int)strlen(name));
 
-    /* 10. Structs */
+    
     struct Point p1;
     p1.x = 3;
     p1.y = 4;
     printf("point=(%d,%d)\\n", p1.x, p1.y);
 
-    /* 11. Pointers */
+  
     int target = 99;
     int *ptr = &target;
     *ptr = 100;
     printf("target via pointer=%d\\n", target);
 
-    /* 12. Pointer + array (pass array to function) */
+   
     int small[3] = {1, 2, 3};
     scaleArray(small, 3, 10);
     printf("scaled: %d %d %d\\n", small[0], small[1], small[2]);
 
-    /* 13. Dynamic memory */
+   
     int *heapArr = (int*)malloc(4 * sizeof(int));
     for (i = 0; i < 4; i++) heapArr[i] = i * i;
     printf("heap: %d %d %d %d\\n", heapArr[0], heapArr[1], heapArr[2], heapArr[3]);
