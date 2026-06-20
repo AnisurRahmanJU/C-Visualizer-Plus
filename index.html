@@ -1,122 +1,179 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>C Visualizer Plus</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
-    <link rel="stylesheet" href="styles.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C Visualizer Plus</title>
+
+<!-- Font Awesome 6 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<!-- Fira Code + Inter -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- CodeMirror -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/display/rulers.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/comment/comment.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <header class="app-header">
-        <div class="brand">
-            <span class="icon"></span>
-            <div>
-                <h1>C Visualizer Plus</h1>
-                <p>Step by Step Visualize C Code</p>
-            </div>
+
+<div id="titlebar">
+  <div class="tb-logo">
+    <div class="tb-logo-icon">C</div>
+    <span class="logo-text">C Visualizer Plus</span>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="sample-group">
+    <label><i class="fa-solid fa-folder-open"></i></label>
+    <select class="vsc-select" id="sample-sel">
+      <option value="">— Examples —</option>
+      <optgroup label="Big Demo">
+        <option value="all_topics"> All Topics Covered</option>
+      </optgroup>
+      <optgroup label="Basics">
+        <option value="hello">Hello World</option>
+        <option value="variables">Variables &amp; Types</option>
+        <option value="arithmetic">Arithmetic Operators</option>
+      </optgroup>
+      <optgroup label="Control Flow">
+        <option value="if_else">If / Else</option>
+        <option value="for_loop">For Loop</option>
+        <option value="while_loop">While Loop</option>
+        <option value="switch_case">Switch Case</option>
+      </optgroup>
+      <optgroup label="Functions">
+        <option value="function">Functions</option>
+        <option value="recursion">Factorial (Recursion)</option>
+      </optgroup>
+      <optgroup label="Data">
+        <option value="array">Arrays</option>
+        <option value="string">Strings</option>
+        <option value="struct">Structs</option>
+        <option value="2darray">2D Arrays</option>
+      </optgroup>
+      <optgroup label="Pointers &amp; Memory">
+        <option value="pointer">Pointers</option>
+        <option value="swap">Swap via Pointer</option>
+        <option value="malloc">malloc / free</option>
+      </optgroup>
+      <optgroup label="Algorithms">
+        <option value="fibonacci">Fibonacci</option>
+        <option value="bubble_sort">Bubble Sort</option>
+        <option value="binary_search">Binary Search</option>
+      </optgroup>
+      <optgroup label="I/O">
+        <option value="scanf">User Input (scanf)</option>
+      </optgroup>
+    </select>
+  </div>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="clear-btn" title="Clear editor">
+    <i class="fa-solid fa-file-circle-plus"></i><span>New</span>
+  </button>
+  <div class="tb-spacer"></div>
+  <button class="tb-btn primary" id="run-btn">
+    <i class="fa-solid fa-play"></i><span>Run &amp; Visualize</span>
+  </button>
+  <button class="tb-btn icon-only" id="reset-btn" title="Reset visualization">
+    <i class="fa-solid fa-rotate-left"></i>
+  </button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn icon-only" id="theme-toggle" title="Toggle dark / light theme">
+    <i class="fa-solid fa-sun" id="theme-icon"></i>
+  </button>
+</div>
+
+<div id="app">
+  <div id="editor-panel">
+    <div class="editor-tabs">
+      <div class="e-tab active"><i class="fa-solid fa-file-code"></i> main.c</div>
+    </div>
+    <div id="cm-host"><textarea id="code-input"></textarea></div>
+    <div id="ctrl-bar">
+      <button class="ctrl-btn" id="prev-btn" disabled title="Previous step (←)">
+        <i class="fa-solid fa-backward-step"></i> Prev
+      </button>
+      <button class="ctrl-btn" id="next-btn" disabled title="Next step (→)">
+        Next <i class="fa-solid fa-forward-step"></i>
+      </button>
+      <button class="ctrl-btn play-btn" id="play-btn" disabled title="Play (Space)">
+        <i class="fa-solid fa-play"></i> Play
+      </button>
+      <button class="ctrl-btn play-btn" id="pause-btn" disabled style="display:none;background:#cca700;border-color:#cca700" title="Pause (Space)">
+        <i class="fa-solid fa-pause"></i> Pause
+      </button>
+      <div class="step-badge" id="step-info">Not running</div>
+      <div class="speed-wrap">
+        <i class="fa-solid fa-gauge-high"></i>
+        <input type="range" id="speed" min="1" max="10" value="5">
+      </div>
+    </div>
+  </div>
+
+  <div id="resize-handle"></div>
+
+  <div id="viz-panel">
+    <div class="wt-box" id="walkthrough">
+      <b>Welcome to C Visualizer.</b><br>
+      Write any C code in the editor — or pick an example — then click <b>Run &amp; Visualize</b> to step through execution line by line.
+    </div>
+    <div id="viz-grid">
+      <div class="viz-card" id="card-memory">
+        <div class="viz-card-hdr"><i class="fa-solid fa-microchip"></i> Variables</div>
+        <div class="viz-card-body">
+          <div id="frames-container"></div>
+          <div id="heap-section" style="display:none">
+            <div class="sec-hdr"><i class="fa-solid fa-database"></i> Heap Memory</div>
+            <div id="heap-blocks"></div>
+          </div>
         </div>
-        <div class="runtime-controls">
-            <select id="sample-selector" class="dropdown">
-                <optgroup label="1. Loops & Conditions">
-                    <option value="ex1" selected>1. Loop Counting</option>
-                    <option value="ex2">2. Loop Summation</option>
-                    <option value="ex3">3. Loop Multiplication</option>
-                    <option value="ex4">4. If-Else Branching</option>
-                </optgroup>
-                <optgroup label="2. Arrays & Buffers">
-                    <option value="ex5">5. Array Updation</option>
-                    <option value="ex6">6. Array Accessing</option>
-                    <option value="ex7">7. String Mutation</option>
-                    <option value="ex8">8. Array Pointering</option>
-                </optgroup>
-                <optgroup label="3. Structure & String">
-                    <option value="ex9">9. Structure Init</option>
-                    <option value="ex10">10. Structure Update</option>
-                    <option value="ex11">11. Structure Copy</option>
-                    <option value="ex12">12. String Copy</option>
-                </optgroup>
-                <optgroup label="4. Memory & Pointer">
-                    <option value="ex13">13. Memory Allocation</option>
-                    <option value="ex14">14. Double Pointring</option>
-                    <option value="ex15">15. Pointer Function</option>
-                    <option value="ex16">16. Value Swapping</option>
-                </optgroup>
-                <optgroup label="5. Function & Others">
-                    <option value="ex17">17. Switch Case Condition</option>
-                    <option value="ex18">18. Recursive Fibonacci</option>
-                    <option value="ex19">19. Accumulator Loop</option>
-                    <option value="ex20">20. Checksum Calculation</option>
-                </optgroup>
-            </select>
-            <button id="btn-run" class="btn success">▶️ Run </button>
-            <button id="btn-prev" class="btn danger" disabled>⬅️ Prev</button>
-            <button id="btn-next" class="btn primary" disabled>➡️ Next</button>
+      </div>
+      <div class="viz-card" id="card-output">
+        <div class="viz-card-hdr"><i class="fa-solid fa-terminal"></i> Output</div>
+        <div class="viz-card-body">
+          <div id="output-area">— no output yet —</div>
+          <div class="stdin-row">
+            <input type="text" id="stdin-in" placeholder="Provide input for scanf() — press Enter to send">
+            <button class="ctrl-btn" id="stdin-btn"><i class="fa-solid fa-paper-plane"></i> Send</button>
+          </div>
         </div>
-    </header>
-    <main class="app-workspace">
-        <section class="workspace-panel ide-panel">
-            <div class="panel-bar">
-                <span>📄 main.c</span>
-                <span class="status-badge" id="engine-status">Idle</span>
-            </div>
-            <div class="editor-container"><textarea id="c-editor"></textarea></div>
-            <div class="panel-bar console-bar">📟 Standard Output (stdout)</div>
-            <div id="terminal" class="terminal-view">
-                <div class="sys-ln">Awaiting compilation parsing framework mapping tracks...</div>
-            </div>
-        </section>
-        <section class="workspace-panel viz-panel">
-            <div class="viz-sub-row grid-2">
-                <div class="viz-card">
-                    <div class="card-header">🔍 Active Variable Value Trace</div>
-                    <div class="card-body scrollable">
-                        <table class="data-table">
-                            <thead>
-                                <tr><th>Variable</th><th>Type</th><th>Scope Frame</th><th>Value</th></tr>
-                            </thead>
-                            <tbody id="var-trace-table">
-                                <tr><td colspan="4" class="empty">No active scalar variables tracked.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="viz-card">
-                    <div class="card-header">📊 Memory Layout Structure (Arrays/Strings)</div>
-                    <div class="card-body flex-center" id="structure-visualization">
-                        <div class="empty-state">No continuous block structure loaded.</div>
-                    </div>
-                </div>
-            </div>
-            <div class="viz-sub-row grid-3-segment">
-                <div class="viz-card segment-card stack-seg">
-                    <div class="card-header stack-hdr">🥞 Call Stack Frames (High Addr)</div>
-                    <div class="card-body segment-body" id="stack-frame-container"><div class="empty-state">Stack Empty</div></div>
-                </div>
-                <div class="viz-card segment-card heap-seg">
-                    <div class="card-header heap-hdr">💎 Dynamic Heap Memory (Low Addr)</div>
-                    <div class="card-body segment-body" id="heap-frame-container"><div class="empty-state">Heap Unallocated</div></div>
-                </div>
-                <div class="viz-card segment-card static-seg">
-                    <div class="card-header static-hdr">💾 Static Global & Text Segments</div>
-                    <div class="card-body segment-body">
-                        <div class="static-row"><span class="addr">0x0040B000</span> <span class="lbl">.text:</span> <span class="val">Instructions</span></div>
-                        <div class="static-row"><span class="addr">0x0040A000</span> <span class="lbl">.data:</span> <span class="val" id="data-seg-val">Empty</span></div>
-                        <div class="static-row"><span class="addr">0x00409000</span> <span class="lbl">.bss:</span> <span class="val" id="bss-seg-val">Clean Block</span></div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </main>
-    <footer class="app-footer">
-        <p>Contact: <a href="mailto:poetanis@gmail.com">poetanis@gmail.com</a> | All rights reserved by <a href="https://programming24.school.blog" target="_blank">Programming24 School</a> | Developer: <a href="https://www.grameenphone.academy/public-profile/GP153876" target="_blank">Md. Anisur Rahman</a> | <a href="https://github.com/AnisurRahmanJU/C-Visualizer-Plus" target="_blank">GitHub Repository</a></p>
-    </footer>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
-    <script src="script.js"></script>
+      </div>
+      <div class="viz-card" id="card-callstack">
+        <div class="viz-card-hdr"><i class="fa-solid fa-layer-group"></i> Call Stack</div>
+        <div class="viz-card-body">
+          <div id="cs-container"></div>
+        </div>
+      </div>
+      <div class="viz-card" id="card-memmap">
+        <div class="viz-card-hdr"><i class="fa-solid fa-map"></i> Memory Map</div>
+        <div class="viz-card-body">
+          <div id="mm-area"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">
+  <div class="sb-seg"><i class="fa-solid fa-circle" id="sb-dot" style="font-size:7px"></i> <span id="sb-txt">Ready</span></div>
+  <div class="sb-sep"></div>
+  <div class="sb-seg"><i class="fa-solid fa-code"></i> Line <span id="sb-line">—</span></div>
+  <div class="sb-sep"></div>
+  <div class="sb-seg"><i class="fa-solid fa-shoe-prints"></i> Step <span id="sb-step">—</span></div>
+  <div class="sb-sep"></div>
+  <div class="sb-seg"><i class="fa-solid fa-layer-group"></i> Frames <span id="sb-frames">0</span></div>
+  <div class="sb-spacer"></div>
+  <span class="sb-hint">C99 · UTF-8 · ← → navigate · Space play/pause · F5 run</span>
+</div>
+<script src="script.js"></script>
 </body>
 </html>
