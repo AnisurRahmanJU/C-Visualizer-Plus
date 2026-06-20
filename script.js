@@ -1476,7 +1476,7 @@ function resetViz() {
   framesEl.innerHTML = '';
   heapSec.style.display = 'none'; heapBlocks.innerHTML = '';
   csEl.innerHTML = ''; mmEl.innerHTML = '';
-  showWalk('', '<b>Welcome to C Visualizer.</b><br>Write any C code in the editor — or pick an example — then click <b>Run &amp; Visualize</b> to step through execution line by line.');
+  showWalk('', '<b>Welcome to C Visualizer Plus.</b><br>Write any C code in the editor - or pick an example - then click <b>Run &amp; Visualize</b> to step through execution line by line.');
   clearLineHL(); updateCtrl(); setStatus('', 'Ready');
   sbLine.textContent = '—'; sbStep.textContent = '—'; sbFrames.textContent = '0';
 }
