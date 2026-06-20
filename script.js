@@ -6,10 +6,6 @@ all_topics:`#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
-/* ── A long tour through C: types, control flow, functions,
-   recursion, arrays, 2D arrays, strings, structs, pointers
-   and dynamic memory — all in one program. ── */
-
 struct Point {
     int x;
     int y;
