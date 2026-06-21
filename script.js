@@ -1595,7 +1595,7 @@ function buildArrCellsHtml(val, type, isChar) {
   val.forEach((c, ci) => {
     const num = Number(c) || 0;
     const glyph = charMode ? (num === 0 ? '\\\\0' : (num >= 32 && num < 127 ? String.fromCharCode(num) : '·')) : String(num);
-    html += `<div class="arr-cell" title="dec:${num} bin:${toBinaryStr(num, charMode ? 'char' : 'int')}">${String(glyph).replace(/</g,'&lt;')}<span class="ac-bin">${toBinaryStr(num, charMode ? 'char' : 'int')}</span></div>`;
+    html += `<div class="arr-cell" title="dec:${num} bin:${toBinaryStr(num, charMode ? 'char' : 'int')}">${String(glyph).replace(/</g,'&lt;')}<span class="ac-bin">${toBinaryStr(num, charMode ? 'char' : 'int')}</span><span class="arr-idx" style="position:static;display:block;margin-top:1px;font-size:8px;color:var(--text3);">[${ci}]</span></div>`;
   });
   html += '</div>';
   return html;
