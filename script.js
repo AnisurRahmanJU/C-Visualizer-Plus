@@ -1573,15 +1573,20 @@ function showWalk(type, html) {
 function groupNibbles(s) {
   return s.replace(/(.{4})/g, '$1 ').trim();
 }
+function chunkBytes(s, sep) {
+  const bytes = [];
+  for (let i = 0; i < s.length; i += 8) bytes.push(s.slice(i, i + 8));
+  return bytes.join(sep);
+}
 function intToBinary(val, bits) {
   let n = Math.trunc(val);
   if (n < 0) n = (Math.pow(2, bits) + n);
   let s = (n % Math.pow(2, bits)).toString(2);
   while (s.length < bits) s = '0' + s;
   if (s.length > bits) s = s.slice(-bits);
-  return groupNibbles(s);
+  return s;
 }
-function floatToBinaryPoint(val, totalBits) {
+function floatToBinaryPointRaw(val, totalBits) {
   const neg = val < 0;
   let v = Math.abs(val);
   let intPart = Math.floor(v);
@@ -1594,15 +1599,37 @@ function floatToBinaryPoint(val, totalBits) {
     if (fracPart >= 1) { fracBin += '1'; fracPart -= 1; } else fracBin += '0';
   }
   if (!fracBin) fracBin = '0';
-  return (neg ? '-' : '') + groupNibbles(intBin) + '.' + groupNibbles(fracBin);
+  return { neg, intBin, fracBin };
 }
-function toBinaryStr(val, type) {
-  if (typeof val !== 'number' || !Number.isFinite(val)) return '—';
+function rawBits(val, type) {
+  if (typeof val !== 'number' || !Number.isFinite(val)) return null;
   const t = type || '';
   if (t.includes('float') || t.includes('double') || !Number.isInteger(val)) {
-    return floatToBinaryPoint(val, 32);
+    const { neg, intBin, fracBin } = floatToBinaryPointRaw(val, 32);
+    let full = (intBin + fracBin);
+    while (full.length < 32) full += '0';
+    full = full.slice(0, 32);
+    return { bits: full, neg, pointAt: intBin.length };
   }
-  return intToBinary(val, 32);
+  return { bits: intToBinary(val, 32), neg: false, pointAt: -1 };
+}
+// Plain text version (4 lines, byte per line) — safe for title/tooltip attributes.
+function toBinaryStr(val, type) {
+  const r = rawBits(val, type);
+  if (!r) return '—';
+  let s = r.bits;
+  if (r.pointAt >= 0) s = s.slice(0, r.pointAt) + '.' + s.slice(r.pointAt);
+  return (r.neg ? '-' : '') + s.match(/.{1,8}/g).join('\n');
+}
+// HTML version: always 4 rows of 8 bits, one per line (for inline display in cells).
+function toBinaryHtml(val, type) {
+  const r = rawBits(val, type);
+  if (!r) return '—';
+  const rows = [];
+  for (let i = 0; i < 32; i += 8) rows.push(r.bits.slice(i, i + 8));
+  const sign = r.neg ? '<div style="color:var(--vsc-red)">&minus; sign</div>' : '';
+  const pointNote = r.pointAt >= 0 ? `<div style="opacity:.7">point after bit ${r.pointAt}</div>` : '';
+  return sign + rows.map(row => `<div>${row}</div>`).join('') + pointNote;
 }
 function segBadge(seg) {
   if (!seg) return '';
@@ -1615,7 +1642,7 @@ function buildArrCellsHtml(val, type, isChar) {
   val.forEach((c, ci) => {
     const num = Number(c) || 0;
     const glyph = charMode ? (num === 0 ? '\\\\0' : (num >= 32 && num < 127 ? String.fromCharCode(num) : '·')) : String(num);
-    html += `<div class="arr-cell" title="dec:${num} bin:${toBinaryStr(num, charMode ? 'char' : 'int')}">${String(glyph).replace(/</g,'&lt;')}<span class="ac-bin">${toBinaryStr(num, charMode ? 'char' : 'int')}</span><span class="arr-idx" style="position:static;display:block;margin-top:1px;font-size:8px;color:var(--text3);">[${ci}]</span></div>`;
+    html += `<div class="arr-cell" title="dec:${num}&#10;bin:${toBinaryStr(num, charMode ? 'char' : 'int')}">${String(glyph).replace(/</g,'&lt;')}<span class="ac-bin">${toBinaryHtml(num, charMode ? 'char' : 'int')}</span><span class="arr-idx" style="position:static;display:block;margin-top:1px;font-size:8px;color:var(--text3);">[${ci}]</span></div>`;
   });
   html += '</div>';
   return html;
@@ -1695,13 +1722,13 @@ function renderFrames(frames, chg) {
             d = `'\\x${val.toString(16).padStart(2, "0")}'`;
 
         // KEEP THE BINARY COLUMN
-        binHtml = `<span class="vbin">${toBinaryStr(val, "char")}</span>`;
+        binHtml = `<span class="vbin">${toBinaryHtml(val, "char")}</span>`;
     }
     else {
         d = String(val ?? 0);
 
         if (typeof val === "number")
-            binHtml = `<span class="vbin">${toBinaryStr(val, v.type)}</span>`;
+            binHtml = `<span class="vbin">${toBinaryHtml(val, v.type)}</span>`;
     }
 
     vhtml = `<span class="vv${isChanged ? ' vc' : ''}">${d.replace(/</g,'&lt;')}</span>`;
