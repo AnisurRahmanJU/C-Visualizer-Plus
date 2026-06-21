@@ -1274,7 +1274,7 @@ class CInterpreter {
       } else {
         // nothing pre-queued: ask the user right now via a browser prompt
         const prompted = window.prompt(
-          'Take input (' + spec + '):',
+          'Take Input (' + spec + '):',
           ''
         );
         // null means the user cancelled — treat as 0
