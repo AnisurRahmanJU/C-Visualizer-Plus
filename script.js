@@ -499,7 +499,9 @@ class CInterpreter {
     this.code = code;
     this.steps = [];
     this.errors = [];
-    this.stdinQueue = stdinQ || [];
+    // FIX: store a LIVE REFERENCE to the queue, not a spread copy.
+    // This means values added via sendStdin() after construction are visible.
+    this.stdinQueue = stdinQ;
     this._stdinIdx = 0;
     this._addrCtr = 0x7fff0000;
     this._heapCtr = 0x2000;
@@ -880,7 +882,6 @@ class CInterpreter {
       frame.vars[d.name]=entry;
       if(s.isStatic) this._staticStore[frame.name+'::'+d.name]=entry;
 
-      // --- CHANGE THIS LINE TO PASS vt ---
       this._addStep({ln:s.ln,desc:`Declare <code>${s.isStatic?'static ':''}${vt} ${d.name}</code>${d.init?` = <b>${this._fv(val, vt)}</b>`:''}`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d.name});
       frame.vars[d.name].changed=false;
     }
@@ -1255,15 +1256,71 @@ class CInterpreter {
     return out.length;
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // FIXED _scanf
+  //
+  // Root cause 1: the constructor used to do `this.stdinQueue = stdinQ || []`
+  //   where stdinQ was already a spread copy ([...stdinQ] in runVisualize).
+  //   Any values added via sendStdin() after Run was clicked were pushed onto
+  //   the *original* array, not the copy the interpreter held — so scanf never
+  //   saw them and fell through to the hardcoded '0' default.
+  //
+  // Root cause 2: the fallback was the string '0', which parseInt('0') === 0,
+  //   yet the bug report says "25". That suggests the stdinQ array happened to
+  //   contain a leftover '25' from a previous run (since stdinQ was never
+  //   cleared on reset). This is fixed by resetting stdinQ in resetViz().
+  //
+  // Fix summary:
+  //   • Constructor stores the SAME array reference that the UI pushes to.
+  //   • When the queue is empty, window.prompt() asks the user interactively.
+  //   • resetViz() now does `stdinQ = []` so stale values can't carry over.
+  //   • runVisualize() passes `stdinQ` directly (no spread).
+  // ─────────────────────────────────────────────────────────────────────────────
   _scanf(args,callSite,frame){
-    const fmt=args[0]||'';const specs=(fmt.match(/%[diouxXeEfgGcsp]/g)||[]);
+    const fmt=args[0]||'';
+    const specs=(fmt.match(/%[diouxXeEfgGcsp]/g)||[]);
     let read=0;
     for(let i=0;i<specs.length;i++){
-      const spec=specs[i];const addr=args[i+1];
-      const raw=this._stdinIdx<this.stdinQueue.length?this.stdinQueue[this._stdinIdx++]:'0';
-      const parsed=(spec==='%f'||spec==='%lf'||spec==='%g')?parseFloat(raw):(parseInt(raw)||0);
-      for(const f of[...this._callStack,this._globalFrame]){if(!f)continue;for(const[k,v]of Object.entries(f.vars)){if(v.addr===addr){v.value=parsed;v.changed=true;read++;}}}
-      this._addStep({ln:callSite?.ln||1,desc:`<code>scanf</code> read input: <b>"${raw}"</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+      const spec=specs[i];
+      const addr=args[i+1];
+
+      let raw;
+      if(this._stdinIdx < this.stdinQueue.length){
+        // consume next pre-queued value
+        raw = String(this.stdinQueue[this._stdinIdx++]);
+      } else {
+        // nothing pre-queued: ask the user right now via a browser prompt
+        const prompted = window.prompt(
+          'scanf() is waiting for input (' + spec + ')\nType a value and press OK:',
+          ''
+        );
+        // null means the user cancelled — treat as 0
+        raw = (prompted !== null && prompted.trim() !== '') ? prompted.trim() : '0';
+        // record so the step log shows the real value
+        this.stdinQueue.push(raw);
+        this._stdinIdx++;
+      }
+
+      const parsed = (spec==='%f' || spec==='%lf' || spec==='%g')
+        ? (parseFloat(raw) || 0)
+        : (parseInt(raw)   || 0);
+
+      // write the parsed value into whichever variable has this address
+      for(const f of [...this._callStack, this._globalFrame]){
+        if(!f) continue;
+        for(const [k,v] of Object.entries(f.vars)){
+          if(v.addr === addr){ v.value = parsed; v.changed = true; read++; }
+        }
+      }
+
+      // echo the raw input to the output panel (matches real terminal behaviour)
+      this.output += raw + '\n';
+      this._addStep({
+        ln: callSite?.ln || 1,
+        desc: `<code>scanf</code> read: <b>"${raw}"</b> &rarr; stored as <b>${parsed}</b>`,
+        frames: this._snapFrames(), heap: this._snapHeap(), out: this.output,
+        cs: this._callStack.map(f=>f.name)
+      });
     }
     return read;
   }
@@ -1451,10 +1508,10 @@ stdinBtn.addEventListener('click', sendStdin);
 stdinIn.addEventListener('keydown', e => { if (e.key === 'Enter') sendStdin(); });
 function sendStdin() {
   const v = stdinIn.value.trim(); if (!v) return;
+  // Push into the shared stdinQ array — the interpreter holds the same reference
   stdinQ.push(v);
-  if (interp) interp.stdinQueue = stdinQ;
   stdinIn.value = '';
-  outputArea.textContent += `[stdin: ${v}]\n`;
+  outputArea.textContent += `[stdin queued: ${v}]\n`;
 }
 
 runBtn.addEventListener('click', runVisualize);
@@ -1467,7 +1524,9 @@ function runVisualize() {
   setStatus('running', 'Interpreting…');
   clearOutput();
   try {
-    interp = new CInterpreter(code, [...stdinQ]);
+    // FIX: pass stdinQ directly — NOT [...stdinQ] — so the interpreter and
+    // the UI share the exact same array object and any future pushes are visible.
+    interp = new CInterpreter(code, stdinQ);
     if (interp.errors.length) {
       showWalk('err', '<i class="fa-solid fa-triangle-exclamation"></i> ' + interp.errors.join('<br>'));
       setStatus('error', 'Parse error'); updateCtrl(); return;
@@ -1485,6 +1544,9 @@ function runVisualize() {
 
 function resetViz() {
   stopPlay(); interp = null; curStep = -1;
+  // FIX: reset the stdin queue so stale values from a previous run can't
+  // silently be consumed by a new run, causing wrong default inputs.
+  stdinQ = [];
   clearOutput();
   framesEl.innerHTML = '';
   heapSec.style.display = 'none'; heapBlocks.innerHTML = '';
@@ -1626,7 +1688,6 @@ function rawBits(val, type) {
   }
   return { bits: intToBinary(val, 32), neg: false, pointAt: -1 };
 }
-// Plain text version (4 lines, byte per line) — safe for title/tooltip attributes.
 function toBinaryStr(val, type) {
   const r = rawBits(val, type);
   if (!r) return '—';
@@ -1634,7 +1695,6 @@ function toBinaryStr(val, type) {
   if (r.pointAt >= 0) s = s.slice(0, r.pointAt) + '.' + s.slice(r.pointAt);
   return (r.neg ? '-' : '') + s.match(/.{1,8}/g).join('\n');
 }
-// HTML version: always 4 rows of 8 bits, one per line (for inline display in cells).
 function toBinaryHtml(val, type) {
   const r = rawBits(val, type);
   if (!r) return '—';
@@ -1741,7 +1801,6 @@ function renderFrames(frames, chg) {
         else
             d = `'\\x${val.toString(16).padStart(2, "0")}'`;
 
-        // KEEP THE BINARY COLUMN
         binHtml = `<span class="vbin">${toBinaryHtml(val, "char")}</span>`;
     }
     else {
