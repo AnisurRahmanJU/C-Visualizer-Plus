@@ -1258,23 +1258,6 @@ class CInterpreter {
 
   // ─────────────────────────────────────────────────────────────────────────────
   // FIXED _scanf
-  //
-  // Root cause 1: the constructor used to do `this.stdinQueue = stdinQ || []`
-  //   where stdinQ was already a spread copy ([...stdinQ] in runVisualize).
-  //   Any values added via sendStdin() after Run was clicked were pushed onto
-  //   the *original* array, not the copy the interpreter held — so scanf never
-  //   saw them and fell through to the hardcoded '0' default.
-  //
-  // Root cause 2: the fallback was the string '0', which parseInt('0') === 0,
-  //   yet the bug report says "25". That suggests the stdinQ array happened to
-  //   contain a leftover '25' from a previous run (since stdinQ was never
-  //   cleared on reset). This is fixed by resetting stdinQ in resetViz().
-  //
-  // Fix summary:
-  //   • Constructor stores the SAME array reference that the UI pushes to.
-  //   • When the queue is empty, window.prompt() asks the user interactively.
-  //   • resetViz() now does `stdinQ = []` so stale values can't carry over.
-  //   • runVisualize() passes `stdinQ` directly (no spread).
   // ─────────────────────────────────────────────────────────────────────────────
   _scanf(args,callSite,frame){
     const fmt=args[0]||'';
@@ -1291,7 +1274,7 @@ class CInterpreter {
       } else {
         // nothing pre-queued: ask the user right now via a browser prompt
         const prompted = window.prompt(
-          'scanf() is waiting for input (' + spec + ')\nType a value and press OK:',
+          'Take input (' + spec + '):',
           ''
         );
         // null means the user cancelled — treat as 0
