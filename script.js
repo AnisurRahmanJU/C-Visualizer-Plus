@@ -1570,19 +1570,39 @@ function showWalk(type, html) {
   walkEl.innerHTML = html;
 }
 
+function groupNibbles(s) {
+  return s.replace(/(.{4})/g, '$1 ').trim();
+}
+function intToBinary(val, bits) {
+  let n = Math.trunc(val);
+  if (n < 0) n = (Math.pow(2, bits) + n);
+  let s = (n % Math.pow(2, bits)).toString(2);
+  while (s.length < bits) s = '0' + s;
+  if (s.length > bits) s = s.slice(-bits);
+  return groupNibbles(s);
+}
+function floatToBinaryPoint(val, totalBits) {
+  const neg = val < 0;
+  let v = Math.abs(val);
+  let intPart = Math.floor(v);
+  let fracPart = v - intPart;
+  let intBin = intPart === 0 ? '0' : intPart.toString(2);
+  let fracBits = Math.max(0, totalBits - intBin.length);
+  let fracBin = '';
+  for (let i = 0; i < fracBits; i++) {
+    fracPart *= 2;
+    if (fracPart >= 1) { fracBin += '1'; fracPart -= 1; } else fracBin += '0';
+  }
+  if (!fracBin) fracBin = '0';
+  return (neg ? '-' : '') + groupNibbles(intBin) + '.' + groupNibbles(fracBin);
+}
 function toBinaryStr(val, type) {
   if (typeof val !== 'number' || !Number.isFinite(val)) return '—';
   const t = type || '';
-  let bits = 32;
-  if (t.includes('char')) bits = 8;
-  else if (t.includes('short')) bits = 16;
-  else if (t.includes('long') || t.includes('double')) bits = 32; // display capped at 32 for readability
-  let n = Math.trunc(val);
-  if (n < 0) n = (Math.pow(2, bits) + n) >>> 0;
-  let s = (n >>> 0).toString(2);
-  if (s.length > bits) s = s.slice(-bits);
-  while (s.length < bits) s = '0' + s;
-  return s.replace(/(.{4})/g, '$1 ').trim();
+  if (t.includes('float') || t.includes('double') || !Number.isInteger(val)) {
+    return floatToBinaryPoint(val, 32);
+  }
+  return intToBinary(val, 32);
 }
 function segBadge(seg) {
   if (!seg) return '';
