@@ -1174,8 +1174,9 @@ class CInterpreter {
         const isChar=(this._lastCastType||'').includes('char');
         const elemLen=isChar?Math.max(1,sz):Math.max(1,Math.floor(sz/4)||sz);
         const addr=this._heapAddr();
-        this._heap[addr]={size:sz,data:{},arr:new Array(elemLen).fill(0),isChar};
-        this._addStep({ln:e.fn.ln||1,desc:`<code>${fnName}(${sz})</code> &rarr; allocated at heap <b>${addr}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+        const zeroed=(fnName==='calloc');
+        this._heap[addr]={size:sz,data:{},arr:new Array(elemLen).fill(0),isChar,init:new Array(elemLen).fill(zeroed)};
+        this._addStep({ln:e.fn.ln||1,desc:`<code>${fnName}(${sz})</code> &rarr; allocated at heap <b>${addr}</b>${zeroed?' (zero-initialized)':' (uninitialized memory)'}`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
         return addr;
       }
       case 'realloc': {
@@ -1185,10 +1186,16 @@ class CInterpreter {
         const newElemLen=isChar?Math.max(1,newSize):Math.max(1,Math.floor(newSize/4)||newSize);
         const newAddr=this._heapAddr();
         const newArr=new Array(newElemLen).fill(0);
-        if(old&&old.arr){ for(let i=0;i<Math.min(old.arr.length,newArr.length);i++) newArr[i]=old.arr[i]; }
-        this._heap[newAddr]={size:newSize,data:{},arr:newArr,isChar};
+        const newInit=new Array(newElemLen).fill(false);
+        if(old&&old.arr){
+          for(let i=0;i<Math.min(old.arr.length,newArr.length);i++){
+            newArr[i]=old.arr[i];
+            newInit[i]=old.init?!!old.init[i]:false;
+          }
+        }
+        this._heap[newAddr]={size:newSize,data:{},arr:newArr,isChar,init:newInit};
         if(old) delete this._heap[oldPtr];
-        this._addStep({ln:e.fn.ln||1,desc:`<code>realloc(${oldPtr}, ${newSize})</code> &rarr; moved/resized to heap <b>${newAddr}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+        this._addStep({ln:e.fn.ln||1,desc:`<code>realloc(${oldPtr}, ${newSize})</code> &rarr; moved/resized to heap <b>${newAddr}</b> (new bytes uninitialized)`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
         return newAddr;
       }
       case 'free': {
@@ -1315,10 +1322,15 @@ class CInterpreter {
     offset = offset||0;
     const buf=this._resolveBuffer(target);
     if(!buf) return;
-    for(let i=0;i<str.length;i++){ buf[offset+i]=str.charCodeAt(i); }
+    const heapBlock=(typeof target==='string')?this._heap[target]:null;
+    for(let i=0;i<str.length;i++){
+      buf[offset+i]=str.charCodeAt(i);
+      if(heapBlock&&heapBlock.init) heapBlock.init[offset+i]=true;
+    }
     const end=offset+str.length;
     if(end<buf.length) buf[end]=0; else buf.push(0);
-    if(typeof target==='string' && this._heap[target]) this._heap[target].data['text']=this._readCString(target);
+    if(heapBlock&&heapBlock.init){ while(heapBlock.init.length<buf.length) heapBlock.init.push(false); heapBlock.init[end]=true; }
+    if(heapBlock) heapBlock.data['text']=this._readCString(target);
   }
   _szType(t){if(t.includes('char'))return 1;if(t.includes('short'))return 2;if(t.includes('int')||t.includes('float'))return 4;if(t.includes('double')||t.includes('long'))return 8;if(t.includes('*'))return 8;return 4;}
   _szOf(v){if(Array.isArray(v))return v.length*4;return 4;}
@@ -1338,7 +1350,7 @@ class CInterpreter {
     return fs;
   }
   _deepCopy(v){ if(Array.isArray(v)) return v.map(x=>this._deepCopy(x)); if(v&&typeof v==='object') return {...v}; return v; }
-  _snapHeap(){const h={};for(const[k,v]of Object.entries(this._heap))h[k]={size:v.size,data:{...v.data},arr:v.arr?v.arr.slice():[],isChar:!!v.isChar};return h;}
+  _snapHeap(){const h={};for(const[k,v]of Object.entries(this._heap))h[k]={size:v.size,data:{...v.data},arr:v.arr?v.arr.slice():[],isChar:!!v.isChar,init:v.init?v.init.slice():[]};return h;}
   _addStep(s){if(this.steps.length<800)this.steps.push(s);}
 }
 
@@ -1636,13 +1648,20 @@ function segBadge(seg) {
   const labels = { data: 'Data', bss: 'BSS', heap: 'Heap', stack: 'Stack', static: 'Static' };
   return `<span class="seg-badge ${seg}">${labels[seg] || seg}</span>`;
 }
-function buildArrCellsHtml(val, type, isChar) {
+function buildArrCellsHtml(val, type, isChar, initArr) {
   const charMode = isChar || (type && type.includes('char'));
   let html = '<div class="arr-row">';
   val.forEach((c, ci) => {
     const num = Number(c) || 0;
-    const glyph = charMode ? (num === 0 ? '\\\\0' : (num >= 32 && num < 127 ? String.fromCharCode(num) : '·')) : String(num);
-    html += `<div class="arr-cell" title="dec:${num}&#10;bin:${toBinaryStr(num, charMode ? 'char' : 'int')}">${String(glyph).replace(/</g,'&lt;')}<span class="ac-bin">${toBinaryHtml(num, charMode ? 'char' : 'int')}</span><span class="arr-idx" style="position:static;display:block;margin-top:1px;font-size:8px;color:var(--text3);">[${ci}]</span></div>`;
+    const isInit = !initArr || initArr[ci] !== false;
+    let glyph;
+    if (charMode) {
+      if (num === 0) glyph = isInit ? '\\\\0' : '?';
+      else glyph = (num >= 32 && num < 127 ? String.fromCharCode(num) : '·');
+    } else {
+      glyph = isInit ? String(num) : '?';
+    }
+    html += `<div class="arr-cell" title="dec:${num}&#10;bin:${toBinaryStr(num, charMode ? 'char' : 'int')}${isInit?'':'&#10;(uninitialized)'}">${String(glyph).replace(/</g,'&lt;')}<span class="ac-bin">${toBinaryHtml(num, charMode ? 'char' : 'int')}</span><span class="arr-idx" style="position:static;display:block;margin-top:1px;font-size:8px;color:var(--text3);">[${ci}]</span></div>`;
   });
   html += '</div>';
   return html;
@@ -1765,7 +1784,7 @@ function renderHeap(heap) {
     if (block.arr && block.arr.length) {
       const body = document.createElement('div');
       body.className = 'hb-body';
-      body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar);
+      body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar, block.init);
       d.appendChild(body);
     }
     heapBlocks.appendChild(d);
