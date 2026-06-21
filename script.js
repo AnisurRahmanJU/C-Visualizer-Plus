@@ -1,3 +1,4 @@
+
 'use strict';
 
 const SAMPLES = {
@@ -1358,7 +1359,7 @@ let interp = null, curStep = -1, playTimer = null, stdinQ = [], execLine = null;
 
 const root = document.documentElement;
 const themeIcon = document.getElementById('theme-icon');
-let currentTheme = 'dark';
+let currentTheme = 'light';
 function applyTheme(t){
   currentTheme = t;
   root.setAttribute('data-theme', t);
@@ -1836,5 +1837,5 @@ function setStatus(type, msg) {
   sbTxt.textContent = msg;
 }
 
-applyTheme('dark');
+applyTheme('light');
 resetViz();
