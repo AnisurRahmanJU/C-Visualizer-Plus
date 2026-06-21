@@ -1656,7 +1656,7 @@ function buildArrCellsHtml(val, type, isChar, initArr) {
     const isInit = !initArr || initArr[ci] !== false;
     let glyph;
     if (charMode) {
-      if (num === 0) glyph = isInit ? '\\\\0' : '?';
+      if (num === 0) glyph = isInit ? '\\0' : '?';
       else glyph = (num >= 32 && num < 127 ? String.fromCharCode(num) : '·');
     } else {
       glyph = isInit ? String(num) : '?';
