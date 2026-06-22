@@ -1263,13 +1263,13 @@ file_io:`#include <stdio.h>
 
 int main(void) {
     char fileBuffer[3][30] = {
-        "Line 1: Hello File!\n",
-        "Line 2: C is great.\n",
-        "Line 3: File I/O demo.\n"
+        "Line 1: Hello File!\\n",
+        "Line 2: C is great.\\n",
+        "Line 3: File I/O demo.\\n"
     };
     
-    printf("Written to test.txt\n");
-    printf("Reading back:\n");
+    printf("Written to test.txt\\n");
+    printf("Reading back:\\n");
     
     for (int i = 0; i < 3; i++) {
         printf("  %s", fileBuffer[i]);
