@@ -1472,22 +1472,24 @@ int main() {
 }`,
 function_ptr:`#include <stdio.h>
 
+typedef int (*operation_func)(int, int);
+
 int add(int a, int b)  { return a + b; }
 int sub(int a, int b)  { return a - b; }
 int mul(int a, int b)  { return a * b; }
 
-void apply(int (*op)(int,int), int x, int y, char *name) {
+void apply(operation_func op, int x, int y, char *name) {
     printf("%s(%d, %d) = %d\\n", name, x, y, op(x, y));
 }
 
 int main() {
-    int (*ops[3])(int, int) = {add, sub, mul};
+    operation_func ops[3] = {add, sub, mul};
     char *names[3] = {"add", "sub", "mul"};
     int i;
     for (i = 0; i < 3; i++)
         apply(ops[i], 10, 3, names[i]);
 
-    int (*fp)(int, int);
+    operation_func fp;
     fp = add;
     printf("\\nDirect call via fp: %d\\n", fp(7, 8));
     fp = mul;
