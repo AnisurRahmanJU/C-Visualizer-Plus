@@ -1,4 +1,3 @@
-
 'use strict';
 
 const SAMPLES = {
@@ -491,7 +490,1068 @@ int main() {
     int sum = a + b;
     printf("Sum: %d + %d = %d\\n", a, b, sum);
     return 0;
-}`
+}`,
+
+linear_search:`#include <stdio.h>
+
+int linearSearch(int arr[], int n, int key) {
+    int i;
+    for (i = 0; i < n; i++) {
+        if (arr[i] == key) return i;
+    }
+    return -1;
+}
+
+int main() {
+    int arr[7] = {5, 3, 8, 1, 9, 2, 7};
+    int key = 9;
+    int n = 7;
+    printf("Array: ");
+    int i;
+    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\\nSearching for: %d\\n", key);
+    int result = linearSearch(arr, n, key);
+    if (result != -1)
+        printf("Found at index: %d\\n", result);
+    else
+        printf("Not found\\n");
+    return 0;
+}`,
+
+selection_sort:`#include <stdio.h>
+
+void selectionSort(int arr[], int n) {
+    int i, j, minIdx, temp;
+    for (i = 0; i < n - 1; i++) {
+        minIdx = i;
+        for (j = i + 1; j < n; j++) {
+            if (arr[j] < arr[minIdx])
+                minIdx = j;
+        }
+        temp = arr[minIdx];
+        arr[minIdx] = arr[i];
+        arr[i] = temp;
+        printf("Pass %d: ", i + 1);
+        int k;
+        for (k = 0; k < n; k++) printf("%d ", arr[k]);
+        printf("\\n");
+    }
+}
+
+int main() {
+    int arr[6] = {64, 25, 12, 22, 11, 90};
+    int n = 6;
+    printf("Before: ");
+    int i;
+    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\\n");
+    selectionSort(arr, n);
+    printf("Sorted: ");
+    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\\n");
+    return 0;
+}`,
+
+insertion_sort:`#include <stdio.h>
+
+void insertionSort(int arr[], int n) {
+    int i, key, j;
+    for (i = 1; i < n; i++) {
+        key = arr[i];
+        j = i - 1;
+        while (j >= 0 && arr[j] > key) {
+            arr[j + 1] = arr[j];
+            j--;
+        }
+        arr[j + 1] = key;
+        printf("Step %d: ", i);
+        int k;
+        for (k = 0; k < n; k++) printf("%d ", arr[k]);
+        printf("\\n");
+    }
+}
+
+int main() {
+    int arr[6] = {12, 11, 13, 5, 6, 7};
+    int n = 6;
+    printf("Before: ");
+    int i;
+    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\\n");
+    insertionSort(arr, n);
+    printf("Sorted: ");
+    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\\n");
+    return 0;
+}`,
+
+merge_sort:`#include <stdio.h>
+
+void merge(int arr[], int l, int m, int r) {
+    int n1 = m - l + 1;
+    int n2 = r - m;
+    int L[10], R[10];
+    int i, j, k;
+    for (i = 0; i < n1; i++) L[i] = arr[l + i];
+    for (j = 0; j < n2; j++) R[j] = arr[m + 1 + j];
+    i = 0; j = 0; k = l;
+    while (i < n1 && j < n2) {
+        if (L[i] <= R[j]) { arr[k] = L[i]; i++; }
+        else              { arr[k] = R[j]; j++; }
+        k++;
+    }
+    while (i < n1) { arr[k] = L[i]; i++; k++; }
+    while (j < n2) { arr[k] = R[j]; j++; k++; }
+}
+
+void mergeSort(int arr[], int l, int r) {
+    if (l < r) {
+        int m = l + (r - l) / 2;
+        mergeSort(arr, l, m);
+        mergeSort(arr, m + 1, r);
+        merge(arr, l, m, r);
+        printf("Merged [%d..%d]: ", l, r);
+        int i;
+        for (i = l; i <= r; i++) printf("%d ", arr[i]);
+        printf("\\n");
+    }
+}
+
+int main() {
+    int arr[6] = {38, 27, 43, 3, 9, 82};
+    int n = 6;
+    printf("Before: ");
+    int i;
+    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\\n");
+    mergeSort(arr, 0, n - 1);
+    printf("Sorted: ");
+    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\\n");
+    return 0;
+}`,
+
+quick_sort:`#include <stdio.h>
+
+int partition(int arr[], int low, int high) {
+    int pivot = arr[high];
+    int i = low - 1, j, temp;
+    for (j = low; j < high; j++) {
+        if (arr[j] <= pivot) {
+            i++;
+            temp = arr[i]; arr[i] = arr[j]; arr[j] = temp;
+        }
+    }
+    temp = arr[i + 1]; arr[i + 1] = arr[high]; arr[high] = temp;
+    printf("Pivot %d placed at index %d\\n", pivot, i + 1);
+    return i + 1;
+}
+
+void quickSort(int arr[], int low, int high) {
+    if (low < high) {
+        int pi = partition(arr, low, high);
+        quickSort(arr, low, pi - 1);
+        quickSort(arr, pi + 1, high);
+    }
+}
+
+int main() {
+    int arr[7] = {10, 7, 8, 9, 1, 5, 3};
+    int n = 7;
+    printf("Before: ");
+    int i;
+    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\\n");
+    quickSort(arr, 0, n - 1);
+    printf("Sorted: ");
+    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\\n");
+    return 0;
+}`,
+
+stack_array:`#include <stdio.h>
+#define MAX 10
+
+int stack[MAX];
+int top = -1;
+
+void push(int val) {
+    if (top >= MAX - 1) { printf("Stack overflow!\\n"); return; }
+    stack[++top] = val;
+    printf("Pushed %d  (top=%d)\\n", val, top);
+}
+
+int pop() {
+    if (top < 0) { printf("Stack underflow!\\n"); return -1; }
+    int v = stack[top--];
+    printf("Popped %d  (top=%d)\\n", v, top);
+    return v;
+}
+
+int peek() { return (top >= 0) ? stack[top] : -1; }
+
+int main() {
+    push(10);
+    push(20);
+    push(30);
+    printf("Peek: %d\\n", peek());
+    pop();
+    pop();
+    printf("Peek: %d\\n", peek());
+    pop();
+    pop();
+    return 0;
+}`,
+
+queue_array:`#include <stdio.h>
+#define MAX 8
+
+int queue[MAX];
+int front = 0, rear = -1, size = 0;
+
+void enqueue(int val) {
+    if (size >= MAX) { printf("Queue full!\\n"); return; }
+    rear = (rear + 1) % MAX;
+    queue[rear] = val;
+    size++;
+    printf("Enqueued %d  (front=%d rear=%d size=%d)\\n", val, front, rear, size);
+}
+
+int dequeue() {
+    if (size == 0) { printf("Queue empty!\\n"); return -1; }
+    int v = queue[front];
+    front = (front + 1) % MAX;
+    size--;
+    printf("Dequeued %d  (front=%d rear=%d size=%d)\\n", v, front, rear, size);
+    return v;
+}
+
+int main() {
+    enqueue(10);
+    enqueue(20);
+    enqueue(30);
+    enqueue(40);
+    dequeue();
+    dequeue();
+    enqueue(50);
+    dequeue();
+    dequeue();
+    dequeue();
+    return 0;
+}`,
+
+linked_list:`#include <stdio.h>
+#include <stdlib.h>
+
+struct Node {
+    int data;
+    struct Node *next;
+};
+
+struct Node* createNode(int data) {
+    struct Node *n = (struct Node*)malloc(sizeof(struct Node));
+    n->data = data;
+    n->next = NULL;
+    return n;
+}
+
+void printList(struct Node *head) {
+    struct Node *cur = head;
+    printf("List: ");
+    while (cur != NULL) {
+        printf("%d -> ", cur->data);
+        cur = cur->next;
+    }
+    printf("NULL\\n");
+}
+
+int main() {
+    struct Node *head = NULL;
+    struct Node *n1 = createNode(10);
+    struct Node *n2 = createNode(20);
+    struct Node *n3 = createNode(30);
+    struct Node *n4 = createNode(40);
+    head = n1;
+    n1->next = n2;
+    n2->next = n3;
+    n3->next = n4;
+    printList(head);
+    printf("Head: %d\\n", head->data);
+    printf("Head->next: %d\\n", head->next->data);
+    struct Node *newNode = createNode(15);
+    newNode->next = n1->next;
+    n1->next = newNode;
+    printList(head);
+    return 0;
+}`,
+
+linked_list_delete:`#include <stdio.h>
+#include <stdlib.h>
+
+struct Node {
+    int data;
+    struct Node *next;
+};
+
+struct Node* newNode(int d) {
+    struct Node *n = (struct Node*)malloc(sizeof(struct Node));
+    n->data = d; n->next = NULL; return n;
+}
+
+struct Node* deleteNode(struct Node *head, int key) {
+    struct Node *temp = head, *prev = NULL;
+    if (temp != NULL && temp->data == key) {
+        head = temp->next;
+        free(temp);
+        printf("Deleted head %d\\n", key);
+        return head;
+    }
+    while (temp != NULL && temp->data != key) {
+        prev = temp; temp = temp->next;
+    }
+    if (temp == NULL) { printf("%d not found\\n", key); return head; }
+    prev->next = temp->next;
+    free(temp);
+    printf("Deleted %d\\n", key);
+    return head;
+}
+
+void print(struct Node *h) {
+    printf("List: ");
+    while (h) { printf("%d -> ", h->data); h = h->next; }
+    printf("NULL\\n");
+}
+
+int main() {
+    struct Node *head = newNode(10);
+    head->next = newNode(20);
+    head->next->next = newNode(30);
+    head->next->next->next = newNode(40);
+    print(head);
+    head = deleteNode(head, 20);
+    print(head);
+    head = deleteNode(head, 10);
+    print(head);
+    head = deleteNode(head, 99);
+    print(head);
+    return 0;
+}`,
+
+stack_linked_list:`#include <stdio.h>
+#include <stdlib.h>
+
+struct Node { int data; struct Node *next; };
+
+struct Node *top = NULL;
+
+void push(int val) {
+    struct Node *n = (struct Node*)malloc(sizeof(struct Node));
+    n->data = val;
+    n->next = top;
+    top = n;
+    printf("Pushed %d\\n", val);
+}
+
+int pop() {
+    if (!top) { printf("Underflow\\n"); return -1; }
+    int v = top->data;
+    struct Node *t = top;
+    top = top->next;
+    free(t);
+    printf("Popped %d\\n", v);
+    return v;
+}
+
+int peek() { return top ? top->data : -1; }
+
+int main() {
+    push(5);
+    push(15);
+    push(25);
+    printf("Peek: %d\\n", peek());
+    pop();
+    printf("Peek: %d\\n", peek());
+    pop();
+    pop();
+    pop();
+    return 0;
+}`,
+
+queue_linked_list:`#include <stdio.h>
+#include <stdlib.h>
+
+struct Node { int data; struct Node *next; };
+struct Node *front = NULL, *rear = NULL;
+
+void enqueue(int val) {
+    struct Node *n = (struct Node*)malloc(sizeof(struct Node));
+    n->data = val; n->next = NULL;
+    if (!rear) { front = rear = n; }
+    else { rear->next = n; rear = n; }
+    printf("Enqueued %d\\n", val);
+}
+
+int dequeue() {
+    if (!front) { printf("Empty\\n"); return -1; }
+    int v = front->data;
+    struct Node *t = front;
+    front = front->next;
+    if (!front) rear = NULL;
+    free(t);
+    printf("Dequeued %d\\n", v);
+    return v;
+}
+
+int main() {
+    enqueue(100);
+    enqueue(200);
+    enqueue(300);
+    dequeue();
+    enqueue(400);
+    dequeue();
+    dequeue();
+    dequeue();
+    return 0;
+}`,
+
+bst_insert:`#include <stdio.h>
+#include <stdlib.h>
+
+struct Node {
+    int data;
+    struct Node *left, *right;
+};
+
+struct Node* newNode(int d) {
+    struct Node *n = (struct Node*)malloc(sizeof(struct Node));
+    n->data = d; n->left = n->right = NULL; return n;
+}
+
+struct Node* insert(struct Node *root, int d) {
+    if (!root) { printf("Insert %d as new node\\n", d); return newNode(d); }
+    if (d < root->data) {
+        printf("Go left  from %d\\n", root->data);
+        root->left  = insert(root->left,  d);
+    } else if (d > root->data) {
+        printf("Go right from %d\\n", root->data);
+        root->right = insert(root->right, d);
+    } else {
+        printf("%d already exists\\n", d);
+    }
+    return root;
+}
+
+void inorder(struct Node *root) {
+    if (!root) return;
+    inorder(root->left);
+    printf("%d ", root->data);
+    inorder(root->right);
+}
+
+int main() {
+    struct Node *root = NULL;
+    root = insert(root, 50);
+    root = insert(root, 30);
+    root = insert(root, 70);
+    root = insert(root, 20);
+    root = insert(root, 40);
+    root = insert(root, 60);
+    root = insert(root, 80);
+    printf("Inorder: ");
+    inorder(root);
+    printf("\\n");
+    return 0;
+}`,
+
+bst_search:`#include <stdio.h>
+#include <stdlib.h>
+
+struct Node {
+    int data;
+    struct Node *left, *right;
+};
+
+struct Node* newNode(int d) {
+    struct Node *n = (struct Node*)malloc(sizeof(struct Node));
+    n->data = d; n->left = n->right = NULL; return n;
+}
+
+struct Node* insert(struct Node *root, int d) {
+    if (!root) return newNode(d);
+    if (d < root->data) root->left  = insert(root->left,  d);
+    else if (d > root->data) root->right = insert(root->right, d);
+    return root;
+}
+
+int search(struct Node *root, int key) {
+    if (!root) { printf("Not found\\n"); return 0; }
+    printf("Visiting %d\\n", root->data);
+    if (root->data == key) { printf("Found %d!\\n", key); return 1; }
+    if (key < root->data)  return search(root->left,  key);
+    else                   return search(root->right, key);
+}
+
+int main() {
+    struct Node *root = NULL;
+    int vals[7] = {50, 30, 70, 20, 40, 60, 80};
+    int i;
+    for (i = 0; i < 7; i++) root = insert(root, vals[i]);
+    printf("Search 40:\\n");
+    search(root, 40);
+    printf("Search 99:\\n");
+    search(root, 99);
+    return 0;
+}`,
+
+tree_traversal:`#include <stdio.h>
+#include <stdlib.h>
+
+struct Node {
+    int data;
+    struct Node *left, *right;
+};
+
+struct Node* newNode(int d) {
+    struct Node *n = (struct Node*)malloc(sizeof(struct Node));
+    n->data = d; n->left = n->right = NULL; return n;
+}
+
+void inorder(struct Node *r)  { if(!r) return; inorder(r->left);  printf("%d ", r->data); inorder(r->right); }
+void preorder(struct Node *r) { if(!r) return; printf("%d ", r->data); preorder(r->left);  preorder(r->right); }
+void postorder(struct Node *r){ if(!r) return; postorder(r->left); postorder(r->right); printf("%d ", r->data); }
+
+int main() {
+    struct Node *root = newNode(1);
+    root->left        = newNode(2);
+    root->right       = newNode(3);
+    root->left->left  = newNode(4);
+    root->left->right = newNode(5);
+    root->right->left = newNode(6);
+    root->right->right= newNode(7);
+    printf("Inorder   (L Root R): "); inorder(root);   printf("\\n");
+    printf("Preorder  (Root L R): "); preorder(root);  printf("\\n");
+    printf("Postorder (L R Root): "); postorder(root); printf("\\n");
+    return 0;
+}`,
+
+graph_bfs:`#include <stdio.h>
+#define V 6
+
+int adj[V][V];
+int visited[V];
+int queue[V];
+int qFront = 0, qRear = -1, qSize = 0;
+
+void enqueue(int v) { queue[++qRear] = v; qSize++; }
+int  dequeue()      { qSize--; return queue[qFront++]; }
+
+void addEdge(int u, int v) { adj[u][v] = 1; adj[v][u] = 1; }
+
+void bfs(int start) {
+    int i;
+    for (i = 0; i < V; i++) visited[i] = 0;
+    visited[start] = 1;
+    enqueue(start);
+    printf("BFS from %d: ", start);
+    while (qSize > 0) {
+        int node = dequeue();
+        printf("%d ", node);
+        for (i = 0; i < V; i++) {
+            if (adj[node][i] && !visited[i]) {
+                visited[i] = 1;
+                enqueue(i);
+            }
+        }
+    }
+    printf("\\n");
+}
+
+int main() {
+    int i, j;
+    for (i = 0; i < V; i++)
+        for (j = 0; j < V; j++) adj[i][j] = 0;
+    addEdge(0, 1); addEdge(0, 2);
+    addEdge(1, 3); addEdge(1, 4);
+    addEdge(2, 5);
+    bfs(0);
+    return 0;
+}`,
+
+graph_dfs:`#include <stdio.h>
+#define V 6
+
+int adj[V][V];
+int visited[V];
+
+void addEdge(int u, int v) { adj[u][v] = 1; adj[v][u] = 1; }
+
+void dfs(int node) {
+    visited[node] = 1;
+    printf("%d ", node);
+    int i;
+    for (i = 0; i < V; i++) {
+        if (adj[node][i] && !visited[i])
+            dfs(i);
+    }
+}
+
+int main() {
+    int i, j;
+    for (i = 0; i < V; i++) for (j = 0; j < V; j++) adj[i][j] = 0;
+    for (i = 0; i < V; i++) visited[i] = 0;
+    addEdge(0, 1); addEdge(0, 2);
+    addEdge(1, 3); addEdge(1, 4);
+    addEdge(2, 5);
+    printf("DFS from 0: ");
+    dfs(0);
+    printf("\\n");
+    return 0;
+}`,
+
+hash_table:`#include <stdio.h>
+#define SIZE 10
+
+int hashTable[SIZE];
+
+void init() { int i; for(i=0;i<SIZE;i++) hashTable[i] = -1; }
+int  hash(int key) { return key % SIZE; }
+
+void insert(int key) {
+    int idx = hash(key);
+    int start = idx;
+    while (hashTable[idx] != -1) {
+        idx = (idx + 1) % SIZE;
+        if (idx == start) { printf("Table full!\\n"); return; }
+    }
+    hashTable[idx] = key;
+    printf("Insert %d at index %d\\n", key, idx);
+}
+
+int search(int key) {
+    int idx = hash(key);
+    int start = idx;
+    while (hashTable[idx] != -1) {
+        if (hashTable[idx] == key) { printf("Found %d at index %d\\n", key, idx); return idx; }
+        idx = (idx + 1) % SIZE;
+        if (idx == start) break;
+    }
+    printf("%d not found\\n", key);
+    return -1;
+}
+
+int main() {
+    init();
+    insert(5); insert(15); insert(25);
+    insert(3); insert(13);
+    search(15);
+    search(7);
+    int i;
+    printf("Table: ");
+    for (i = 0; i < SIZE; i++) printf("[%d]=%d ", i, hashTable[i]);
+    printf("\\n");
+    return 0;
+}`,
+
+matrix_multiply:`#include <stdio.h>
+
+int main() {
+    int A[2][3] = {{1, 2, 3}, {4, 5, 6}};
+    int B[3][2] = {{7, 8}, {9, 10}, {11, 12}};
+    int C[2][2] = {{0, 0}, {0, 0}};
+    int i, j, k;
+    for (i = 0; i < 2; i++) {
+        for (j = 0; j < 2; j++) {
+            for (k = 0; k < 3; k++) {
+                C[i][j] += A[i][k] * B[k][j];
+            }
+            printf("C[%d][%d] = %d\\n", i, j, C[i][j]);
+        }
+    }
+    return 0;
+}`,
+
+string_reverse:`#include <stdio.h>
+#include <string.h>
+
+void reverseStr(char s[]) {
+    int n = strlen(s);
+    int i;
+    for (i = 0; i < n / 2; i++) {
+        char temp = s[i];
+        s[i] = s[n - 1 - i];
+        s[n - 1 - i] = temp;
+    }
+}
+
+int main() {
+    char str[] = "Hello, World!";
+    printf("Original: %s\\n", str);
+    reverseStr(str);
+    printf("Reversed: %s\\n", str);
+
+    char pal[] = "racecar";
+    printf("\\nIs '%s' a palindrome? ", pal);
+    char copy[20];
+    strcpy(copy, pal);
+    reverseStr(copy);
+    if (strcmp(pal, copy) == 0) printf("Yes\\n");
+    else printf("No\\n");
+    return 0;
+}`,
+
+string_ops:`#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+int main() {
+    char s1[50] = "Hello";
+    char s2[50] = "World";
+    printf("s1=%s  s2=%s\\n", s1, s2);
+    printf("strlen(s1)=%d\\n", (int)strlen(s1));
+    printf("strcmp(s1,s2)=%d\\n", strcmp(s1, s2));
+    strcat(s1, " ");
+    strcat(s1, s2);
+    printf("After strcat: %s\\n", s1);
+    char s3[50];
+    strcpy(s3, s2);
+    printf("strcpy s3=%s\\n", s3);
+    int i;
+    for (i = 0; s3[i]; i++) s3[i] = toupper(s3[i]);
+    printf("toupper: %s\\n", s3);
+    return 0;
+}`,
+
+pointer_arith:`#include <stdio.h>
+
+int main() {
+    int arr[5] = {10, 20, 30, 40, 50};
+    int *p = arr;
+    int i;
+    printf("Using pointer arithmetic:\\n");
+    for (i = 0; i < 5; i++) {
+        printf("*(p+%d) = %d  addr=%p\\n", i, *(p + i), (p + i));
+    }
+    p++;
+    printf("After p++: *p = %d\\n", *p);
+    p += 2;
+    printf("After p+=2: *p = %d\\n", *p);
+    p--;
+    printf("After p--: *p = %d\\n", *p);
+    return 0;
+}`,
+
+double_pointer:`#include <stdio.h>
+
+void doubleIt(int **pp) {
+    **pp = **pp * 2;
+}
+
+int main() {
+    int x = 5;
+    int *p = &x;
+    int **pp = &p;
+    printf("x   = %d\\n", x);
+    printf("*p  = %d\\n", *p);
+    printf("**pp= %d\\n", **pp);
+    doubleIt(pp);
+    printf("After doubleIt:**pp = %d\\n", **pp);
+    printf("x is now = %d\\n", x);
+    return 0;
+}`,
+
+enum_typedef:`#include <stdio.h>
+
+typedef enum { MON=1, TUE, WED, THU, FRI, SAT, SUN } Day;
+
+typedef struct {
+    char name[20];
+    int  age;
+    float gpa;
+} Student;
+
+void printDay(Day d) {
+    switch(d) {
+        case MON: printf("Monday\\n");    break;
+        case TUE: printf("Tuesday\\n");   break;
+        case WED: printf("Wednesday\\n"); break;
+        case THU: printf("Thursday\\n");  break;
+        case FRI: printf("Friday\\n");    break;
+        case SAT: printf("Saturday\\n");  break;
+        case SUN: printf("Sunday\\n");    break;
+    }
+}
+
+int main() {
+    Day today = WED;
+    printf("Today is: "); printDay(today);
+    printf("Day value: %d\\n", today);
+
+    Student s;
+    strcpy(s.name, "Alice");
+    s.age = 20;
+    s.gpa = 3.85f;
+    printf("Student: %s, age %d, GPA %.2f\\n", s.name, s.age, s.gpa);
+    return 0;
+}`,
+
+file_io:`#include <stdio.h>
+
+int main() {
+    FILE *fp;
+    fp = fopen("test.txt", "w");
+    if (fp == NULL) { printf("Cannot open file\\n"); return 1; }
+    fprintf(fp, "Line 1: Hello File!\\n");
+    fprintf(fp, "Line 2: C is great.\\n");
+    fprintf(fp, "Line 3: File I/O demo.\\n");
+    fclose(fp);
+    printf("Written to test.txt\\n");
+
+    fp = fopen("test.txt", "r");
+    if (fp == NULL) { printf("Cannot open file\\n"); return 1; }
+    char line[100];
+    printf("Reading back:\\n");
+    while (fgets(line, sizeof(line), fp)) {
+        printf("  %s", line);
+    }
+    fclose(fp);
+    return 0;
+}`,
+
+bitwise_ops:`#include <stdio.h>
+
+void printBits(int n) {
+    int i;
+    for (i = 7; i >= 0; i--)
+        printf("%d", (n >> i) & 1);
+    printf(" (%d)\\n", n);
+}
+
+int main() {
+    int a = 0b00111100;
+    int b = 0b00001111;
+    printf("a = "); printBits(a);
+    printf("b = "); printBits(b);
+    printf("a & b  = "); printBits(a & b);
+    printf("a | b  = "); printBits(a | b);
+    printf("a ^ b  = "); printBits(a ^ b);
+    printf("~a     = "); printBits(~a & 0xFF);
+    printf("a << 2 = "); printBits((a << 2) & 0xFF);
+    printf("a >> 2 = "); printBits(a >> 2);
+
+    int n = 5;
+    printf("\\nCheck even/odd %d: %s\\n", n, (n & 1) ? "odd" : "even");
+    printf("Multiply %d by 4: %d\\n", n, n << 2);
+    printf("Divide %d by 2:   %d\\n", n, n >> 1);
+    return 0;
+}`,
+
+variadic_func:`#include <stdio.h>
+#include <stdarg.h>
+
+int sumAll(int count, ...) {
+    va_list args;
+    va_start(args, count);
+    int total = 0, i;
+    for (i = 0; i < count; i++) {
+        int v = va_arg(args, int);
+        printf("  arg[%d] = %d\\n", i, v);
+        total += v;
+    }
+    va_end(args);
+    return total;
+}
+
+double average(int count, ...) {
+    va_list args;
+    va_start(args, count);
+    double sum = 0;
+    int i;
+    for (i = 0; i < count; i++) sum += va_arg(args, double);
+    va_end(args);
+    return sum / count;
+}
+
+int main() {
+    printf("sumAll(3, 10,20,30) args:\\n");
+    int s = sumAll(3, 10, 20, 30);
+    printf("Sum = %d\\n", s);
+    printf("sumAll(5, 1,2,3,4,5) args:\\n");
+    s = sumAll(5, 1, 2, 3, 4, 5);
+    printf("Sum = %d\\n", s);
+    return 0;
+}`,
+
+recursion_tower:`#include <stdio.h>
+
+void hanoi(int n, char from, char to, char via) {
+    if (n == 1) {
+        printf("Move disk 1 from %c to %c\\n", from, to);
+        return;
+    }
+    hanoi(n - 1, from, via, to);
+    printf("Move disk %d from %c to %c\\n", n, from, to);
+    hanoi(n - 1, via, to, from);
+}
+
+int main() {
+    int n = 3;
+    printf("Tower of Hanoi with %d disks:\\n", n);
+    hanoi(n, 'A', 'C', 'B');
+    return 0;
+}`,
+
+gcd_lcm:`#include <stdio.h>
+
+int gcd(int a, int b) {
+    printf("gcd(%d, %d)\\n", a, b);
+    if (b == 0) return a;
+    return gcd(b, a % b);
+}
+
+int lcm(int a, int b) {
+    return (a / gcd(a, b)) * b;
+}
+
+int main() {
+    int a = 48, b = 18;
+    printf("Computing GCD(%d, %d):\\n", a, b);
+    int g = gcd(a, b);
+    printf("GCD = %d\\n", g);
+    printf("LCM = %d\\n", lcm(a, b));
+
+    printf("\\nComputing GCD(100, 75):\\n");
+    g = gcd(100, 75);
+    printf("GCD = %d\\n", g);
+    printf("LCM = %d\\n", lcm(100, 75));
+    return 0;
+}`,
+
+prime_sieve:`#include <stdio.h>
+#define N 50
+
+int main() {
+    int sieve[N + 1];
+    int i, j;
+    for (i = 0; i <= N; i++) sieve[i] = 1;
+    sieve[0] = sieve[1] = 0;
+    for (i = 2; i * i <= N; i++) {
+        if (sieve[i]) {
+            printf("Mark multiples of %d\\n", i);
+            for (j = i * i; j <= N; j += i)
+                sieve[j] = 0;
+        }
+    }
+    printf("Primes up to %d: ", N);
+    for (i = 2; i <= N; i++)
+        if (sieve[i]) printf("%d ", i);
+    printf("\\n");
+    return 0;
+}`,
+
+dp_fibonacci:`#include <stdio.h>
+#define MAX 15
+
+int main() {
+    int dp[MAX];
+    dp[0] = 0;
+    dp[1] = 1;
+    int i;
+    printf("dp[0] = 0 (base)\\n");
+    printf("dp[1] = 1 (base)\\n");
+    for (i = 2; i < MAX; i++) {
+        dp[i] = dp[i-1] + dp[i-2];
+        printf("dp[%d] = dp[%d]+dp[%d] = %d+%d = %d\\n",
+               i, i-1, i-2, dp[i-1], dp[i-2], dp[i]);
+    }
+    printf("Fibonacci sequence: ");
+    for (i = 0; i < MAX; i++) printf("%d ", dp[i]);
+    printf("\\n");
+    return 0;
+}`,
+
+dp_knapsack:`#include <stdio.h>
+#define ITEMS 4
+#define CAP 8
+
+int main() {
+    int weight[ITEMS] = {2, 3, 4, 5};
+    int value[ITEMS]  = {3, 4, 5, 7};
+    int dp[ITEMS + 1][CAP + 1];
+    int i, w;
+    for (i = 0; i <= ITEMS; i++) {
+        for (w = 0; w <= CAP; w++) {
+            if (i == 0 || w == 0) { dp[i][w] = 0; continue; }
+            if (weight[i-1] <= w) {
+                int take = value[i-1] + dp[i-1][w - weight[i-1]];
+                int skip = dp[i-1][w];
+                dp[i][w] = take > skip ? take : skip;
+            } else {
+                dp[i][w] = dp[i-1][w];
+            }
+        }
+    }
+    printf("Max value (capacity=%d): %d\\n", CAP, dp[ITEMS][CAP]);
+    printf("DP table last row: ");
+    for (w = 0; w <= CAP; w++) printf("%d ", dp[ITEMS][w]);
+    printf("\\n");
+    return 0;
+}`,
+
+number_base:`#include <stdio.h>
+
+void decToBin(int n) {
+    if (n == 0) { printf("0"); return; }
+    char buf[33]; int i = 0;
+    while (n > 0) { buf[i++] = '0' + (n % 2); n /= 2; }
+    int j; for (j = i-1; j >= 0; j--) printf("%c", buf[j]);
+}
+
+void decToHex(int n) {
+    if (n == 0) { printf("0"); return; }
+    char hex[] = "0123456789ABCDEF";
+    char buf[20]; int i = 0;
+    while (n > 0) { buf[i++] = hex[n % 16]; n /= 16; }
+    int j; for (j = i-1; j >= 0; j--) printf("%c", buf[j]);
+}
+
+int main() {
+    int nums[5] = {0, 10, 42, 100, 255};
+    int i;
+    printf("%-6s %-10s %-10s %-10s\\n", "Dec", "Binary", "Octal", "Hex");
+    for (i = 0; i < 5; i++) {
+        printf("%-6d ", nums[i]);
+        decToBin(nums[i]);
+        printf(" (oct=%o) (hex=", nums[i]);
+        decToHex(nums[i]);
+        printf(")\\n");
+    }
+    return 0;
+}`,
+
+function_ptr:`#include <stdio.h>
+
+int add(int a, int b)  { return a + b; }
+int sub(int a, int b)  { return a - b; }
+int mul(int a, int b)  { return a * b; }
+
+void apply(int (*op)(int,int), int x, int y, char *name) {
+    printf("%s(%d, %d) = %d\\n", name, x, y, op(x, y));
+}
+
+int main() {
+    int (*ops[3])(int, int) = {add, sub, mul};
+    char *names[3] = {"add", "sub", "mul"};
+    int i;
+    for (i = 0; i < 3; i++)
+        apply(ops[i], 10, 3, names[i]);
+
+    int (*fp)(int, int);
+    fp = add;
+    printf("\\nDirect call via fp: %d\\n", fp(7, 8));
+    fp = mul;
+    printf("Direct call via fp: %d\\n", fp(7, 8));
+    return 0;
+}`,
 };
 
 class CInterpreter {
@@ -499,9 +1559,7 @@ class CInterpreter {
     this.code = code;
     this.steps = [];
     this.errors = [];
-    // FIX: store a LIVE REFERENCE to the queue, not a spread copy.
-    // This means values added via sendStdin() after construction are visible.
-    this.stdinQueue = stdinQ;
+    this.stdinQueue = stdinQ || [];
     this._stdinIdx = 0;
     this._addrCtr = 0x7fff0000;
     this._heapCtr = 0x2000;
@@ -881,7 +1939,6 @@ class CInterpreter {
       const entry={type:vt,value:val,addr:this._nextAddr(),changed:true,seg:s.isStatic?'static':'stack'};
       frame.vars[d.name]=entry;
       if(s.isStatic) this._staticStore[frame.name+'::'+d.name]=entry;
-
       this._addStep({ln:s.ln,desc:`Declare <code>${s.isStatic?'static ':''}${vt} ${d.name}</code>${d.init?` = <b>${this._fv(val, vt)}</b>`:''}`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d.name});
       frame.vars[d.name].changed=false;
     }
@@ -1256,9 +2313,6 @@ class CInterpreter {
     return out.length;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // FIXED _scanf
-  // ─────────────────────────────────────────────────────────────────────────────
   _scanf(args,callSite,frame){
     const fmt=args[0]||'';
     const specs=(fmt.match(/%[diouxXeEfgGcsp]/g)||[]);
@@ -1266,37 +2320,24 @@ class CInterpreter {
     for(let i=0;i<specs.length;i++){
       const spec=specs[i];
       const addr=args[i+1];
-
       let raw;
       if(this._stdinIdx < this.stdinQueue.length){
-        // consume next pre-queued value
         raw = String(this.stdinQueue[this._stdinIdx++]);
       } else {
-        // nothing pre-queued: ask the user right now via a browser prompt
-        const prompted = window.prompt(
-          'Take Input (' + spec + '):',
-          ''
-        );
-        // null means the user cancelled — treat as 0
+        const prompted = window.prompt('Take Input (' + spec + '):', '');
         raw = (prompted !== null && prompted.trim() !== '') ? prompted.trim() : '0';
-        // record so the step log shows the real value
         this.stdinQueue.push(raw);
         this._stdinIdx++;
       }
-
       const parsed = (spec==='%f' || spec==='%lf' || spec==='%g')
         ? (parseFloat(raw) || 0)
         : (parseInt(raw)   || 0);
-
-      // write the parsed value into whichever variable has this address
       for(const f of [...this._callStack, this._globalFrame]){
         if(!f) continue;
         for(const [k,v] of Object.entries(f.vars)){
           if(v.addr === addr){ v.value = parsed; v.changed = true; read++; }
         }
       }
-
-      // echo the raw input to the output panel (matches real terminal behaviour)
       this.output += raw + '\n';
       this._addStep({
         ln: callSite?.ln || 1,
@@ -1491,7 +2532,6 @@ stdinBtn.addEventListener('click', sendStdin);
 stdinIn.addEventListener('keydown', e => { if (e.key === 'Enter') sendStdin(); });
 function sendStdin() {
   const v = stdinIn.value.trim(); if (!v) return;
-  // Push into the shared stdinQ array — the interpreter holds the same reference
   stdinQ.push(v);
   stdinIn.value = '';
   outputArea.textContent += `[stdin queued: ${v}]\n`;
@@ -1504,11 +2544,9 @@ function runVisualize() {
   stopPlay();
   const code = cmEditor.getValue().trim();
   if (!code) { showWalk('err', '<i class="fa-solid fa-triangle-exclamation"></i> Please enter a C program.'); return; }
-  setStatus('running', 'Interpreting…');
+  setStatus('running', 'Interpreting\u2026');
   clearOutput();
   try {
-    // FIX: pass stdinQ directly — NOT [...stdinQ] — so the interpreter and
-    // the UI share the exact same array object and any future pushes are visible.
     interp = new CInterpreter(code, stdinQ);
     if (interp.errors.length) {
       showWalk('err', '<i class="fa-solid fa-triangle-exclamation"></i> ' + interp.errors.join('<br>'));
@@ -1518,7 +2556,7 @@ function runVisualize() {
       showWalk('err', 'No steps generated.'); setStatus('error', 'No steps'); return;
     }
     curStep = 0; renderStep(0); updateCtrl();
-    setStatus('ok', `Ready — ${interp.steps.length} steps`);
+    setStatus('ok', `Ready \u2014 ${interp.steps.length} steps`);
   } catch(e) {
     showWalk('err', '<i class="fa-solid fa-triangle-exclamation"></i> ' + (e.message || String(e)));
     setStatus('error', 'Error');
@@ -1527,8 +2565,6 @@ function runVisualize() {
 
 function resetViz() {
   stopPlay(); interp = null; curStep = -1;
-  // FIX: reset the stdin queue so stale values from a previous run can't
-  // silently be consumed by a new run, causing wrong default inputs.
   stdinQ = [];
   clearOutput();
   framesEl.innerHTML = '';
@@ -1536,11 +2572,11 @@ function resetViz() {
   csEl.innerHTML = ''; mmEl.innerHTML = '';
   showWalk('', '<b>Welcome to C Visualizer Plus.</b><br>Write any C code in the editor - or pick an example - then click <b>Run</b> button to visualize step through execution line by line.');
   clearLineHL(); updateCtrl(); setStatus('', 'Ready');
-  sbLine.textContent = '—'; sbStep.textContent = '—'; sbFrames.textContent = '0';
+  sbLine.textContent = '\u2014'; sbStep.textContent = '\u2014'; sbFrames.textContent = '0';
 }
 
 function clearOutput() {
-  outputArea.textContent = '— no output yet —';
+  outputArea.textContent = '\u2014 no output yet \u2014';
 }
 
 prevBtn.addEventListener('click', stepPrev);
@@ -1580,7 +2616,7 @@ function updateCtrl() {
   pauseBtn.disabled = false;
   const txt = has ? `Step ${curStep + 1} / ${interp.steps.length}` : 'Not running';
   stepInfo.textContent = txt;
-  sbStep.textContent = has ? `${curStep + 1}/${interp.steps.length}` : '—';
+  sbStep.textContent = has ? `${curStep + 1}/${interp.steps.length}` : '\u2014';
 }
 
 document.addEventListener('keydown', e => {
@@ -1596,8 +2632,8 @@ function renderStep(idx) {
   const step = interp.steps[idx]; if (!step) return;
   showWalk('', step.desc || '');
   highlightLine(step.ln);
-  sbLine.textContent = step.ln || '—';
-  outputArea.textContent = step.out && step.out.length ? step.out : '— no output yet —';
+  sbLine.textContent = step.ln || '\u2014';
+  outputArea.textContent = step.out && step.out.length ? step.out : '\u2014 no output yet \u2014';
   renderFrames(step.frames, step.chg);
   renderHeap(step.heap);
   renderCS(step.cs);
@@ -1673,14 +2709,14 @@ function rawBits(val, type) {
 }
 function toBinaryStr(val, type) {
   const r = rawBits(val, type);
-  if (!r) return '—';
+  if (!r) return '\u2014';
   let s = r.bits;
   if (r.pointAt >= 0) s = s.slice(0, r.pointAt) + '.' + s.slice(r.pointAt);
   return (r.neg ? '-' : '') + s.match(/.{1,8}/g).join('\n');
 }
 function toBinaryHtml(val, type) {
   const r = rawBits(val, type);
-  if (!r) return '—';
+  if (!r) return '\u2014';
   const rows = [];
   for (let i = 0; i < 32; i += 8) rows.push(r.bits.slice(i, i + 8));
   const sign = r.neg ? '<div style="color:var(--vsc-red)">&minus; sign</div>' : '';
@@ -1701,7 +2737,7 @@ function buildArrCellsHtml(val, type, isChar, initArr) {
     let glyph;
     if (charMode) {
       if (num === 0) glyph = isInit ? '\\0' : '?';
-      else glyph = (num >= 32 && num < 127 ? String.fromCharCode(num) : '·');
+      else glyph = (num >= 32 && num < 127 ? String.fromCharCode(num) : '\u00b7');
     } else {
       glyph = isInit ? String(num) : '?';
     }
@@ -1751,7 +2787,7 @@ function renderFrames(frames, chg) {
         const isPtr = v.type && v.type.includes('*') && !Array.isArray(val);
         const isArr = Array.isArray(val);
 
-        let vhtml, binHtml = '<span class="vbin">—</span>';
+        let vhtml, binHtml = '<span class="vbin">\u2014</span>';
         if (isArr) {
           const is2D = val.length > 0 && Array.isArray(val[0]);
           if (is2D) {
@@ -1768,33 +2804,20 @@ function renderFrames(frames, chg) {
         } else if (isPtr) {
           vhtml = `<span class="vv vptr"><i class="fa-solid fa-link" style="font-size:10px"></i> ${val || 'NULL'}</span>`;
         } else {
-    let d;
-
-    if (val === null) {
-        d = "NULL";
-    }
-    else if (typeof val === "string") {
-        d = `"${val}"`;
-    }
-    else if (v.type && v.type.includes("char") && typeof val === "number") {
-        if (val === 0)
-            d = "'\\0'";
-        else if (val >= 32 && val <= 126)
-            d = `'${String.fromCharCode(val)}'`;
-        else
-            d = `'\\x${val.toString(16).padStart(2, "0")}'`;
-
-        binHtml = `<span class="vbin">${toBinaryHtml(val, "char")}</span>`;
-    }
-    else {
-        d = String(val ?? 0);
-
-        if (typeof val === "number")
-            binHtml = `<span class="vbin">${toBinaryHtml(val, v.type)}</span>`;
-    }
-
-    vhtml = `<span class="vv${isChanged ? ' vc' : ''}">${d.replace(/</g,'&lt;')}</span>`;
-}
+          let d;
+          if (val === null) { d = "NULL"; }
+          else if (typeof val === "string") { d = `"${val}"`; }
+          else if (v.type && v.type.includes("char") && typeof val === "number") {
+            if (val === 0) d = "'\\0'";
+            else if (val >= 32 && val <= 126) d = `'${String.fromCharCode(val)}'`;
+            else d = `'\\x${val.toString(16).padStart(2, "0")}'`;
+            binHtml = `<span class="vbin">${toBinaryHtml(val, "char")}</span>`;
+          } else {
+            d = String(val ?? 0);
+            if (typeof val === "number") binHtml = `<span class="vbin">${toBinaryHtml(val, v.type)}</span>`;
+          }
+          vhtml = `<span class="vv${isChanged ? ' vc' : ''}">${d.replace(/</g,'&lt;')}</span>`;
+        }
 
         tr.innerHTML = `
           <td><span class="vn">${name}</span>${segBadge(v.seg)}</td>
