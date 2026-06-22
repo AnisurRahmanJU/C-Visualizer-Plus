@@ -4,13 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>C Visualizer Plus</title>
-
-<!-- Font Awesome 6 -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<!-- Fira Code + Inter -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<!-- CodeMirror -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/one-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
@@ -18,10 +14,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/display/rulers.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/comment/comment.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -29,129 +21,98 @@
 <div id="titlebar">
   <div class="tb-logo">
     <div class="tb-logo-icon">C</div>
-    <span class="logo-text"><a href="index.html" style="text-decoration:none; color: inherit;">C Visualizer Plus</a></span>
-    
+    <span class="logo-text">C Visualizer Plus</span>
   </div>
   <div class="tb-sep"></div>
   <div class="sample-group">
     <label><i class="fa-solid fa-folder-open"></i></label>
     <select class="vsc-select" id="sample-sel">
-    <option value="">Examples</option>
-
-    <optgroup label="Full Demo Code">
+      <option value="">Examples</option>
+      <optgroup label="Full Demo Code">
         <option value="all_topics">All Topics Covered</option>
         <option value="memory_layout">Full Memory Layout</option>
-    </optgroup>
-
-    <optgroup label="Basics">
+      </optgroup>
+      <optgroup label="Basics">
         <option value="hello">Hello World</option>
-        <option value="variables">Variables & Types</option>
+        <option value="variables">Variables &amp; Types</option>
         <option value="arithmetic">Arithmetic Operators</option>
-    </optgroup>
-
-    <optgroup label="Control Flow">
+      </optgroup>
+      <optgroup label="Control Flow">
         <option value="if_else">If / Else</option>
         <option value="for_loop">For Loop</option>
         <option value="while_loop">While Loop</option>
         <option value="switch_case">Switch Case</option>
-    </optgroup>
-
-    <optgroup label="Functions">
+      </optgroup>
+      <optgroup label="Functions">
         <option value="function">Functions</option>
         <option value="recursion">Factorial (Recursion)</option>
         <option value="recursion_tower">Tower of Hanoi</option>
-        <option value="variadic_func">Variadic Functions</option>
         <option value="function_ptr">Function Pointers</option>
-    </optgroup>
-
-    <optgroup label="Arrays & Strings">
+      </optgroup>
+      <optgroup label="Arrays &amp; Strings">
         <option value="array">Arrays</option>
         <option value="2darray">2D Arrays</option>
         <option value="string">Strings</option>
         <option value="string_reverse">String Reverse</option>
         <option value="string_ops">String Operations</option>
         <option value="matrix_multiply">Matrix Multiplication</option>
-    </optgroup>
-
-    <optgroup label="Structures & Types">
+      </optgroup>
+      <optgroup label="Structures &amp; Types">
         <option value="struct">Structs</option>
-        <option value="enum_typedef">Enum & Typedef</option>
-    </optgroup>
-
-    <optgroup label="Pointers & Memory">
+        <option value="enum_typedef">Enum &amp; Typedef</option>
+      </optgroup>
+      <optgroup label="Pointers &amp; Memory">
         <option value="pointer">Pointers</option>
         <option value="pointer_arith">Pointer Arithmetic</option>
         <option value="double_pointer">Double Pointer</option>
         <option value="swap">Swap via Pointer</option>
         <option value="malloc">malloc / free</option>
-    </optgroup>
-
-    <optgroup label="Searching Algorithms">
+      </optgroup>
+      <optgroup label="Searching">
         <option value="linear_search">Linear Search</option>
         <option value="binary_search">Binary Search</option>
-    </optgroup>
-
-    <optgroup label="Sorting Algorithms">
+      </optgroup>
+      <optgroup label="Sorting">
         <option value="bubble_sort">Bubble Sort</option>
         <option value="selection_sort">Selection Sort</option>
         <option value="insertion_sort">Insertion Sort</option>
         <option value="merge_sort">Merge Sort</option>
         <option value="quick_sort">Quick Sort</option>
-    </optgroup>
-
-    <optgroup label="Mathematics">
+      </optgroup>
+      <optgroup label="Mathematics">
         <option value="fibonacci">Fibonacci</option>
         <option value="dp_fibonacci">DP Fibonacci</option>
-        <option value="gcd_lcm">GCD & LCM</option>
+        <option value="gcd_lcm">GCD &amp; LCM</option>
         <option value="prime_sieve">Prime Sieve</option>
         <option value="number_base">Number Base Conversion</option>
-    </optgroup>
-
-    <optgroup label="Dynamic Programming">
+      </optgroup>
+      <optgroup label="Dynamic Programming">
         <option value="dp_knapsack">0/1 Knapsack</option>
-    </optgroup>
-
-    <optgroup label="Stack">
-        <option value="stack_array">Stack (Array)</option>
+      </optgroup>
+      <optgroup label="Stack">
         <option value="stack_linked_list">Stack (Linked List)</option>
-    </optgroup>
-
-    <optgroup label="Queue">
-        <option value="queue_array">Queue (Array)</option>
+      </optgroup>
+      <optgroup label="Queue">
         <option value="queue_linked_list">Queue (Linked List)</option>
-    </optgroup>
-
-    <optgroup label="Linked Lists">
+      </optgroup>
+      <optgroup label="Linked Lists">
         <option value="linked_list">Linked List Creation</option>
         <option value="linked_list_delete">Linked List Deletion</option>
-    </optgroup>
-
-    <optgroup label="Trees">
-        <option value="bst_insert">Binary Search Tree Insert</option>
-        <option value="bst_search">Binary Search Tree Search</option>
+      </optgroup>
+      <optgroup label="Trees">
+        <option value="bst_insert">BST Insert</option>
+        <option value="bst_search">BST Search</option>
         <option value="tree_traversal">Tree Traversals</option>
-    </optgroup>
-
-    <optgroup label="Graphs">
-        <option value="graph_bfs">Graph BFS</option>
-        <option value="graph_dfs">Graph DFS</option>
-    </optgroup>
-
-    <optgroup label="Hashing">
-        <option value="hash_table">Hash Table</option>
-    </optgroup>
-
-    <optgroup label="Bitwise Operations">
+      </optgroup>
+      <optgroup label="Bitwise">
         <option value="bitwise_ops">Bitwise Operators</option>
-    </optgroup>
-
-    <optgroup label="Input / Output">
+      </optgroup>
+      <optgroup label="Input / Output">
         <option value="scanf">User Input (scanf)</option>
         <option value="file_io">File I/O</option>
-    </optgroup>
-</select>
-</div>
-
+      </optgroup>
+    </select>
+  </div>
   <div class="tb-sep"></div>
   <button class="tb-btn" id="clear-btn" title="Clear editor">
     <i class="fa-solid fa-file-circle-plus"></i><span>New</span>
@@ -201,13 +162,14 @@
   <div id="viz-panel">
     <div class="wt-box" id="walkthrough">
       <b>Welcome to C Visualizer Plus.</b><br>
-      Write any C code in the editor - or pick an example - then click <b>Run</b> button to visualize step through execution line by line.
+      Write any C code in the editor — or pick an example — then click <b>Run</b> to visualize step-by-step execution.
     </div>
     <div id="viz-grid">
+      <!-- card-memory: id="frames-pane" for frames, id="heap-section"/"heap-blocks" for heap -->
       <div class="viz-card" id="card-memory">
         <div class="viz-card-hdr"><i class="fa-solid fa-microchip"></i> Variables</div>
         <div class="viz-card-body">
-          <div id="frames-container"></div>
+          <div id="frames-pane"></div>
           <div id="heap-section" style="display:none">
             <div class="sec-hdr"><i class="fa-solid fa-database"></i> Heap Memory</div>
             <div id="heap-blocks"></div>
@@ -219,21 +181,23 @@
         <div class="viz-card-body">
           <div id="output-area">— no output yet —</div>
           <div class="stdin-row">
-            <input type="text" id="stdin-in" placeholder="" hidden>
-            <button style="display:none;" class="ctrl-btn" id="stdin-btn"><!--<i class="fa-solid fa-paper-plane"></i>--></button>
+            <input type="text" id="stdin-in" placeholder="Queue stdin value…">
+            <button class="ctrl-btn" id="stdin-btn"><i class="fa-solid fa-paper-plane"></i> Send</button>
           </div>
         </div>
       </div>
+      <!-- cs-pane matches $('cs-pane') in JS -->
       <div class="viz-card" id="card-callstack">
         <div class="viz-card-hdr"><i class="fa-solid fa-layer-group"></i> Call Stack</div>
         <div class="viz-card-body">
-          <div id="cs-container"></div>
+          <div id="cs-pane"></div>
         </div>
       </div>
+      <!-- mm-pane matches $('mm-pane') in JS -->
       <div class="viz-card" id="card-memmap">
         <div class="viz-card-hdr"><i class="fa-solid fa-map"></i> Memory Map</div>
         <div class="viz-card-body">
-          <div id="mm-area"></div>
+          <div id="mm-pane"></div>
         </div>
       </div>
     </div>
@@ -249,7 +213,7 @@
   <div class="sb-sep"></div>
   <div class="sb-seg"><i class="fa-solid fa-layer-group"></i> Frames <span id="sb-frames">0</span></div>
   <div class="sb-spacer"></div>
-  <span class="sb-hint">C99 · UTF-8 · ← → navigate · Space play/pause · F5 run</span>
+  <span class="sb-hint">C99 · ← → navigate · Space play/pause · F5 run</span>
 </div>
 <hr>
 <div id="statusbar">
