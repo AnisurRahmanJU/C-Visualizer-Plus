@@ -1498,15 +1498,6 @@ int main() {
 }`,
 };
 
-document.getElementById('zoom-in-btn').addEventListener('click', () => {
-  // Add your zoom-in logic here
-});
-
-document.getElementById('zoom-out-btn').addEventListener('click', () => {
-  // Add your zoom-out logic here
-});
-
-
 // ─── Bit-width helpers ───────────────────────────────────────────────────────
 function bitWidthForType(type) {
   if (!type) return 32;
