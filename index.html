@@ -240,16 +240,28 @@
     </div>
 </div>
 <script>
-let scale = 1;
-const step = 0.1; // How much to zoom per click
+let currentScale = 1;
+const zoomStep = 0.1;
 
-const updateScale = (delta) => {
-  scale = Math.max(0.5, Math.min(scale + delta, 3)); // Limits zoom between 0.5x and 3x
-  document.querySelector('.visualization-container').style.transform = `scale(${scale})`;
-};
+function applyZoom() {
+  document.body.style.transform = `scale(${currentScale})`;
+  document.body.style.width = `${100 / currentScale}%`; // Prevents horizontal scrollbars
+}
 
-document.getElementById('zoom-in-btn').addEventListener('click', () => updateScale(step));
-document.getElementById('zoom-out-btn').addEventListener('click', () => updateScale(-step));
+document.getElementById('zoom-in-btn').addEventListener('click', () => {
+  currentScale += zoomStep;
+  applyZoom();
+});
+
+document.getElementById('zoom-out-btn').addEventListener('click', () => {
+  currentScale = Math.max(0.5, currentScale - zoomStep); // Prevents zooming out too far
+  applyZoom();
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  currentScale = 1;
+  applyZoom();
+});
 </script>
 <script src="script.js"></script>
 </body>
