@@ -4,7 +4,28 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
 
-html,body{height:100%; zoom: 1.5; overflow:auto;font-family:'Inter',system-ui,sans-serif;background:var(--vsc-bg);color:var(--text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+/*html,body{height:100%; overflow:auto;font-family:'Inter',system-ui,sans-serif;background:var(--vsc-bg);color:var(--text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;}*/
+/* Base styles */
+html, body {
+  height: 100%;
+  overflow: auto;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--vsc-bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Desktop Zoom: Apply only to screens wider than 768px */
+@media (min-width: 769px) {
+  body {
+    transform: scale(1.2); /* Adjust this value to your desired zoom level */
+    transform-origin: top center;
+    width: 83.33%; /* (100 / 1.2) - Compensates for the scale to prevent overflow */
+    margin: 0 auto;
+  }
+}
 
 #titlebar {
     height: 48px;
