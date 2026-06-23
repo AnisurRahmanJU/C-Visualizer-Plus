@@ -4,7 +4,17 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
 
-html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;background:var(--vsc-bg);color:var(--text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+/* html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;background:var(--vsc-bg);color:var(--text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;}*/
+html, body {
+    height: 100%;
+    overflow: auto;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--vsc-bg);
+    color: var(--text);
+    font-size: 19.5px; /* Updated from 13px */
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
 /* --- Updated Titlebar for Horizontal Scrolling --- */
 #titlebar {
     height: 48px;
