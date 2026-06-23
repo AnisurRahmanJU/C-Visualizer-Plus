@@ -48,6 +48,25 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
     flex-shrink: 0; 
 }
 
+#output-area {
+    background: #0c0c0c;
+    border: 1px solid var(--vsc-border);
+    border-radius: 4px;
+    padding: 12px 14px;
+    font-family: 'Fira Code', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #cccccc;
+    min-height: 90px;
+    
+    /* These three lines fix your wrapping issue */
+    white-space: pre-wrap;    /* Preserves formatting but wraps text */
+    word-wrap: break-word;    /* Breaks long words if necessary */
+    word-break: break-word;   /* Modern standard for breaking */
+    overflow-x: auto;       /* Prevents horizontal overflow */
+}
+
+
 .tb-logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;color:var(--text-bright);white-space:nowrap;flex-shrink:0;}
 .tb-logo-icon{width:28px;height:28px;background:var(--vsc-accent);border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-family:'Fira Code',monospace;font-weight:700;flex-shrink:0;}
 .tb-sep{width:1px;height:20px;background:var(--vsc-border2);flex-shrink:0;}
