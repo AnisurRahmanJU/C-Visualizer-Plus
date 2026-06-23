@@ -13,7 +13,7 @@ html, body {
   background: var(--vsc-bg);
   color: var(--text);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1;
   -webkit-font-smoothing: antialiased;
 }
 
