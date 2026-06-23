@@ -239,46 +239,6 @@
         </a>
     </div>
 </div>
-<script>
-// Configuration
-let currentScale = 1;
-const zoomStep = 0.1;
-const minScale = 0.5; // Minimum zoom (50%)
-const maxScale = 2.0; // Maximum zoom (200%)
-
-// Select your elements
-const zoomContainer = document.getElementById('zoom-container'); // Ensure your div has this ID
-const zoomInBtn = document.getElementById('zoom-in-btn');
-const zoomOutBtn = document.getElementById('zoom-out-btn');
-const resetBtn = document.getElementById('reset-btn');
-
-// Helper to apply the transformation
-function applyZoom() {
-    zoomContainer.style.transition = "transform 0.2s ease-out";
-    zoomContainer.style.transform = `scale(${currentScale})`;
-    zoomContainer.style.transformOrigin = "top left"; // Keeps zoom anchored to top-left
-}
-
-// Event Listeners
-zoomInBtn.addEventListener('click', () => {
-    if (currentScale < maxScale) {
-        currentScale += zoomStep;
-        applyZoom();
-    }
-});
-
-zoomOutBtn.addEventListener('click', () => {
-    if (currentScale > minScale) {
-        currentScale -= zoomStep;
-        applyZoom();
-    }
-});
-
-resetBtn.addEventListener('click', () => {
-    currentScale = 1;
-    applyZoom();
-});
-</script>
 <script src="script.js"></script>
 </body>
 </html>
