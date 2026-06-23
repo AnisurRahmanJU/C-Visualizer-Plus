@@ -113,12 +113,13 @@
   <button class="tb-btn icon-only" id="reset-btn" title="Reset visualization">
     <i class="fa-solid fa-rotate-left"></i>
   </button>
-  <button class="tb-btn icon-only" id="zoom-in-btn" title="Zoom in">
-  <i class="fa-solid fa-magnifying-glass-plus"></i>
- </button>
- <button class="tb-btn icon-only" id="zoom-out-btn" title="Zoom out">
-  <i class="fa-solid fa-magnifying-glass-minus"></i>
- </button>
+  <button class="tb-btn icon-only" id="zoom-in-btn" title="Zoom In">
+  <i class="fa-solid fa-plus"></i>
+</button>
+
+ <button class="tb-btn icon-only" id="zoom-out-btn" title="Zoom Out">
+  <i class="fa-solid fa-minus"></i>
+</button>
   <div class="tb-sep"></div>
   <button class="tb-btn icon-only" id="theme-toggle" title="Toggle dark / light theme">
     <i class="fa-solid fa-sun" id="theme-icon"></i>
@@ -239,13 +240,16 @@
     </div>
 </div>
 <script>
-document.getElementById('zoom-in-btn').addEventListener('click', () => {
-  // Add your zoom-in logic here
-});
+let scale = 1;
+const step = 0.1; // How much to zoom per click
 
-document.getElementById('zoom-out-btn').addEventListener('click', () => {
-  // Add your zoom-out logic here
-});
+const updateScale = (delta) => {
+  scale = Math.max(0.5, Math.min(scale + delta, 3)); // Limits zoom between 0.5x and 3x
+  document.querySelector('.visualization-container').style.transform = `scale(${scale})`;
+};
+
+document.getElementById('zoom-in-btn').addEventListener('click', () => updateScale(step));
+document.getElementById('zoom-out-btn').addEventListener('click', () => updateScale(-step));
 </script>
 <script src="script.js"></script>
 </body>
