@@ -4,26 +4,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
 
-/* html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;background:var(--vsc-bg);color:var(--text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;}*/
-html, body {
-    height: 100%;
-    overflow: auto;
-    font-family: 'Inter', system-ui, sans-serif;
-    background: var(--vsc-bg);
-    color: var(--text);
-    font-size: 19.5px; /* 13px * 1.5 */
-    line-height: 1.5;
-}
+html,body{height:100%; zoom: 1.5; overflow:auto;font-family:'Inter',system-ui,sans-serif;background:var(--vsc-bg);color:var(--text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;}
 
-/* Update these specific high-impact elements */
-.tb-logo { font-size: 21px; } /* 14px * 1.5 */
-.vsc-select { font-size: 18px; } /* 12px * 1.5 */
-.tb-btn { font-size: 18px; } /* 12px * 1.5 */
-.e-tab { font-size: 18px; } /* 12px * 1.5 */
-.CodeMirror { font-size: 20.25px !important; } /* 13.5px * 1.5 */
-.vtbl { font-size: 18px; } /* 12px * 1.5 */
-.cs-fn { font-size: 18px; } /* 12px * 1.5 */
-/* --- Updated Titlebar for Horizontal Scrolling --- */
 #titlebar {
     height: 48px;
     background: var(--vsc-titlebar);
