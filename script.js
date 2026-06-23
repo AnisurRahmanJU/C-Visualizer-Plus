@@ -894,7 +894,7 @@ bst_insert:`#include <stdio.h>
 
 struct Node {
     int data;
-    struct Node *left, *right;
+    struct Node *left; *right;
 };
 
 struct Node* newNode(int d) {
@@ -942,7 +942,7 @@ bst_search:`#include <stdio.h>
 
 struct Node {
     int data;
-    struct Node *left, *right;
+    struct Node *left; *right;
 };
 
 struct Node* newNode(int d) {
@@ -981,7 +981,7 @@ tree_traversal:`#include <stdio.h>
 
 struct Node {
     int data;
-    struct Node *left, *right;
+    struct Node *left; *right;
 };
 
 struct Node* newNode(int d) {
