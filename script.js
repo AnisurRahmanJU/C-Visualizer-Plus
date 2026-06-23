@@ -2660,7 +2660,7 @@ function resetViz() {
   heapSec.style.display = 'none'; heapBlocks.innerHTML = '';
   csEl.innerHTML = '<div class="empty"><i class="fa-solid fa-layer-group"></i><p>No active function calls.</p></div>';
   mmEl.innerHTML = '<div class="empty"><i class="fa-solid fa-map"></i><p>No memory allocated yet.</p></div>';
-  showWalk('', '<b>Welcome to C Visualizer Plus.</b><br>Write any C code in the editor — or pick an example — then click <b>Run</b> to visualize step-by-step execution.');
+  showWalk('', '<b>Welcome to C Visualizer Plus.</b><br>Write any C code in the editor — or pick an example — then click <b>Visualize</b> button to step-by-step execution.');
   clearLineHL(); updateCtrl(); setStatus('', 'Ready');
   sbLine.textContent = '—'; sbStep.textContent = '—'; sbFrames.textContent = '0';
 }
