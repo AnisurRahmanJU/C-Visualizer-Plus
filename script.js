@@ -1259,22 +1259,35 @@ int main() {
     return 0;
 }`,
 file_io:`#include <stdio.h>
-#include <stdint.h>
+#include <stdlib.h>
 
-int main(void) {
-    char fileBuffer[3][30] = {
-        "Line 1: Hello File!\\n",
-        "Line 2: C is great.\\n",
-        "Line 3: File I/O demo.\\n"
-    };
-    
-    printf("Written to test.txt\\n");
-    printf("Reading back:\\n");
-    
-    for (int i = 0; i < 3; i++) {
-        printf("  %s", fileBuffer[i]);
+int main() {
+    FILE *file;
+    char buffer[256];
+
+    file = fopen("example.txt", "w");
+    if (file == NULL) {
+        printf("Error opening file for writing!\\n");
+        return 1;
     }
 
+    fprintf(file, "Hello, this is a test file.\\n");
+    fprintf(file, "Writing and reading file in C.\\n");
+    fclose(file);
+
+    file = fopen("example.txt", "r");
+    if (file == NULL) {
+        printf("Error opening file for reading!\\n");
+        return 1;
+    }
+
+    printf("File Content Start\\n");
+    while (fgets(buffer, sizeof(buffer), file) != NULL) {
+        printf("%s", buffer);
+    }
+    printf("File Content End\\n");
+
+    fclose(file);
     return 0;
 }`,
 bitwise_ops:`#include <stdio.h>
