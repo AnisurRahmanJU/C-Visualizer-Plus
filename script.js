@@ -1263,7 +1263,7 @@ file_io:`#include <stdio.h>
 int main() {
     FILE *file = fopen("abc.txt", "w");
     if (file != NULL) {
-        fscanf("%s", &file);
+        scanf("%s", &file);
         fclose(file);
     }
 
