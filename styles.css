@@ -172,7 +172,7 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
 .h-sz{color:var(--text2);font-size:10.5px;font-family:'Inter',sans-serif;}
 .h-data{color:var(--vsc-orange);}
 .out-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:7px;}
-#output-area{background:#0c0c0c;border:1px solid var(--vsc-border);border-radius:4px;padding:12px 14px;font-family:'Fira Code',monospace;font-size:13px;line-height:1.8;color:#cccccc;min-height:90px;white-space:pre-wrap;word-break:break-all;margin-bottom:10px; overflow-x: auto;}
+#output-area{background:#0c0c0c;border:1px solid var(--vsc-border);border-radius:4px;padding:12px 14px;font-family:'Fira Code',monospace;font-size:13px;line-height:1.8;color:#cccccc;min-height:90px;white-space:pre-wrap;word-break:break-all;margin-bottom:10px; white-space: pre; overflow-x: auto;}
 [data-theme="light"] #output-area{background:#1e1e1e;}
 .stdin-row{display:flex;gap:7px;}
 #stdin-in{flex:1;background:var(--vsc-input);border:1px solid var(--vsc-border2);color:var(--text);font-family:'Fira Code',monospace;font-size:12.5px;padding:6px 10px;border-radius:3px;outline:none;transition:border-color .12s;}
