@@ -1269,7 +1269,7 @@ int main() {
 
     file = fopen("abc.txt", "r");
     if (file != NULL) {
-        char buffer[10];
+        char buffer[10]= "Anisur";
         if (fgets(buffer, sizeof(buffer), file) != NULL) {
             printf("%s", buffer);
         }
