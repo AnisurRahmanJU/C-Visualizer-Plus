@@ -1981,7 +1981,40 @@ class CInterpreter {
       }
       if(d.isArr){
         const sz=d.arrSize?this._eval(d.arrSize,frame):0;
-        if(d.init){
+        if(d.arrSize2){
+          // ── 2D array declaration (handles both `int a[2][2];` and `int a[2][2] = {1,2,3,4};`
+          //    as well as nested `{{1,2},{3,4}}` initializers) ──
+          const sz2=this._eval(d.arrSize2,frame);
+          if(d.init){
+            const flat=this._flattenInit(d.init,frame);
+            const isNested = flat.length>0 && Array.isArray(flat[0]);
+            const rows=[];
+            if(isNested){
+              for(let r=0;r<sz;r++){
+                const srcRow = flat[r]||[];
+                const row=srcRow.slice(0,sz2);
+                while(row.length<sz2) row.push(0);
+                rows.push(row);
+              }
+            } else {
+              // Flat initializer list (e.g. {1,2,3,4}) — reshape row-major into sz x sz2
+              if(flat.length>sz*sz2){
+                throw new Error(`initializer for array '${d.name}' has too many elements for size [${sz}][${sz2}] (line ${s.ln})`);
+              }
+              for(let r=0;r<sz;r++){
+                const row=[];
+                for(let c=0;c<sz2;c++){
+                  const idx=r*sz2+c;
+                  row.push(idx<flat.length?flat[idx]:0);
+                }
+                rows.push(row);
+              }
+            }
+            val=rows;
+          } else {
+            val=Array.from({length:sz},()=>new Array(sz2).fill(0));
+          }
+        } else if(d.init){
           val=this._flattenInit(d.init,frame);
           if(d.arrSize){
             if(val.length>sz){
@@ -1990,7 +2023,6 @@ class CInterpreter {
             while(val.length<sz) val.push(0);
           }
         }
-        else if(d.arrSize2){ const sz2=this._eval(d.arrSize2,frame); val=Array.from({length:sz},()=>new Array(sz2).fill(0)); }
         else val=new Array(sz).fill(0);
       } else {
         val=d.init?(d.init.type==='arrlit'?this._flattenInit(d.init,frame):this._eval(d.init,frame)):0;
@@ -2406,12 +2438,26 @@ class CInterpreter {
       }
       const parsed = (spec==='%f' || spec==='%lf' || spec==='%g')
         ? (parseFloat(raw) || 0) : (parseInt(raw) || 0);
-      for(const f of [...this._callStack, this._globalFrame]){
-        if(!f) continue;
-        for(const [k,v] of Object.entries(f.vars)){
-          if(v.addr === addr){ v.value = parsed; v.changed = true; read++; }
+
+      // Write the parsed value to wherever `addr` points.
+      // For plain variables (&x) `addr` matches a var's own address directly.
+      // For array elements / struct members reached through &expr (e.g. &num[i][j]),
+      // `_addrOf` records a getter/setter closure in `this._addrCells` keyed by `addr` —
+      // that must be checked too, otherwise scanf into array cells silently does nothing.
+      let wrote=false;
+      if(this._addrCells && this._addrCells[addr]){
+        this._addrCells[addr].set(parsed);
+        wrote=true;
+      } else {
+        for(const f of [...this._callStack, this._globalFrame]){
+          if(!f) continue;
+          for(const [k,v] of Object.entries(f.vars)){
+            if(v.addr === addr){ v.value = parsed; v.changed = true; wrote=true; }
+          }
         }
       }
+      if(wrote) read++;
+
       this.output += raw + '\n';
       this._addStep({ln: callSite?.ln || 1, desc: `<code>scanf</code> read: <b>"${raw}"</b> &rarr; stored as <b>${parsed}</b>`,
         frames: this._snapFrames(), heap: this._snapHeap(), out: this.output, cs: this._callStack.map(f=>f.name)});
