@@ -1,4 +1,3 @@
-
 'use strict';
 
 const SAMPLES = {
@@ -1899,7 +1898,16 @@ class CInterpreter {
       if(this._globalFrame.vars[name]) continue;
       let val;
       if(g.isArr){
-        if(g.init){ val=this._flattenInit(g.init,this._globalFrame); }
+        if(g.init){
+          val=this._flattenInit(g.init,this._globalFrame);
+          if(g.arrSize){
+            const declaredSz=this._eval(g.arrSize,this._globalFrame);
+            if(val.length>declaredSz){
+              throw new Error(`initializer-string for char array '${name}' is too long — increase your array size`);
+            }
+            while(val.length<declaredSz) val.push(0);
+          }
+        }
         else val=[];
       } else {
         val=g.init?this._eval(g.init,this._globalFrame):0;
@@ -1973,7 +1981,15 @@ class CInterpreter {
       }
       if(d.isArr){
         const sz=d.arrSize?this._eval(d.arrSize,frame):0;
-        if(d.init){val=this._flattenInit(d.init,frame);}
+        if(d.init){
+          val=this._flattenInit(d.init,frame);
+          if(d.arrSize){
+            if(val.length>sz){
+              throw new Error(`initializer-string for char array '${d.name}' is too long for the specified size (line ${s.ln}) — increase your array size`);
+            }
+            while(val.length<sz) val.push(0);
+          }
+        }
         else if(d.arrSize2){ const sz2=this._eval(d.arrSize2,frame); val=Array.from({length:sz},()=>new Array(sz2).fill(0)); }
         else val=new Array(sz).fill(0);
       } else {
