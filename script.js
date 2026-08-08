@@ -171,8 +171,8 @@ int main() {
 hello:`#include <stdio.h>
 
 int main() {
-    printf("Hello, World!\\n");
-    printf("Welcome to C Visualizer!\\n");
+    printf("Hi! I am Md. Anisur Rahman.\\n");
+    printf("Welcome to our C Visualizer Plus!\\n");
     return 0;
 }`,
 variables:`#include <stdio.h>
