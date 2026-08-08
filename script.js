@@ -1591,6 +1591,8 @@ class CInterpreter {
     this.output = '';
     this._vaLists = {};
     this._vaListCallArgs = [];
+    this._declaredVars = new Set();
+    this._functionScopes = {};
     try { this._tokenize(); this._buildAST(); this._initGlobals(); this._run(); }
     catch(e) { this.errors.push(e.message || String(e)); }
   }
@@ -1609,12 +1611,14 @@ class CInterpreter {
       if(src[i]==='"'){let s='',j=i+1;while(j<src.length&&src[j]!=='"'){if(src[j]==='\\'&&j+1<src.length){const e=src[j+1];if(e==='n')s+='\n';else if(e==='t')s+='\t';else if(e==='\\')s+='\\';else if(e==='"')s+='"';else if(e==='0')s+='\0';else s+='\\'+e;j+=2;}else{s+=src[j];j++;}}this.tokens.push({t:'str',v:s,ln:line});i=j+1;continue;}
       if(src[i]==="'"){let ch,j=i+1;if(src[j]==='\\'){const e=src[j+1];ch=e==='n'?'\n':e==='t'?'\t':e==='0'?'\0':e==='\\'?'\\':e==="'"?"'":e;j+=2;}else{ch=src[j];j++;}this.tokens.push({t:'char',v:ch,ln:line});i=j+1;continue;}
       if(/[0-9]/.test(src[i])||(src[i]==='.'&&/[0-9]/.test(src[i+1]))){let n='',j=i,f=false;
-        if(src[j]==='0'&&(src[j+1]==='x'||src[j+1]==='X')){n='0x';j+=2;while(j<src.length&&/[0-9a-fA-F]/.test(src[j]))n+=src[j++];this.tokens.push({t:'num',v:parseInt(n,16),ln:line});i=j;continue;}
-        if(src[j]==='0'&&src[j+1]==='b'){n='0b';j+=2;while(j<src.length&&/[01]/.test(src[j]))n+=src[j++];this.tokens.push({t:'num',v:parseInt(n.slice(2),2),ln:line});i=j;continue;}
+        if(src[j]==='0'&&(src[j+1]==='x'||src[j+1]==='X')){n='0x';j+=2;while(j<src.length&&/[0-9a-fA-F]/.test(src[j]))n+=src[j++];this.tokens.push({t:'num',v:parseInt(n,16),ln:line,isFloat:false});i=j;continue;}
+        if(src[j]==='0'&&src[j+1]==='b'){n='0b';j+=2;while(j<src.length&&/[01]/.test(src[j]))n+=src[j++];this.tokens.push({t:'num',v:parseInt(n.slice(2),2),ln:line,isFloat:false});i=j;continue;}
         while(j<src.length&&(/[0-9]/.test(src[j])||(src[j]==='.'&&!f))){if(src[j]==='.')f=true;n+=src[j];j++;}
-        if(src[j]==='f'||src[j]==='F')j++;
+        let hasFloatSuffix=false;
+        if(src[j]==='f'||src[j]==='F'){hasFloatSuffix=true;j++;}
         while(src[j]==='u'||src[j]==='U'||src[j]==='l'||src[j]==='L')j++;
-        this.tokens.push({t:'num',v:f?parseFloat(n):parseInt(n),ln:line});i=j;continue;}
+        const isFloatLit=f||hasFloatSuffix;
+        this.tokens.push({t:'num',v:isFloatLit?parseFloat(n):parseInt(n),ln:line,isFloat:isFloatLit});i=j;continue;}
       if(/[a-zA-Z_]/.test(src[i])){let id='',j=i;while(j<src.length&&/[a-zA-Z0-9_]/.test(src[j])){id+=src[j];j++;}this.tokens.push({t:'id',v:id,ln:line});i=j;continue;}
       const two=src.slice(i,i+2);
       if(['++','--','==','!=','<=','>=','&&','||','->','+=','-=','*=','/=','%=','<<','>>'].includes(two)){this.tokens.push({t:'op',v:two,ln:line});i+=2;continue;}
@@ -1708,6 +1712,10 @@ class CInterpreter {
       if(this._pk().v===';'){this._nx();return;}
       const body=this._parseBlock();
       this.functions[name]={name,type,params,body,line:body.length?body[0].ln:1};
+      this._functionScopes[name] = new Set();
+      for(const p of params) {
+        if(!p.isVariadic) this._functionScopes[name].add(p.name);
+      }
     } else {
       let isArr=false,sz=null;
       if(this._pk().v==='['){this._nx();isArr=true;if(this._pk().v!==']')sz=this._parseExpr();this._ex(']');}
@@ -1720,7 +1728,13 @@ class CInterpreter {
         decls.push({name:nm2,isArr:ia2,arrSize:sz2,init:init2});
       }
       this._ex(';');
-      for(const d of decls) this.globals[d.name]={type,name:d.name,init:d.init,isArr:d.isArr,arrSize:d.arrSize};
+      for(const d of decls) {
+        if (this._globalFrame.vars[d.name] !== undefined) {
+          throw new Error(`redeclaration of '${d.name}' with no linkage near line ${this._pk().ln}`);
+        }
+        this.globals[d.name]={type,name:d.name,init:d.init,isArr:d.isArr,arrSize:d.arrSize};
+        this._declaredVars.add(d.name);
+      }
     }
   }
 
@@ -1797,7 +1811,7 @@ class CInterpreter {
         if(this._pk().v==='['){this._nx();ia=true;if(this._pk().v!==']')as2=this._parseExpr();this._ex(']');}
       }
       if(this._pk().v==='='){this._nx();init=this._parse2DInit();}
-      decls.push({name,isArr:ia,arrSize:as,arrSize2:as2,init});
+      decls.push({name,isArr:ia,arrSize:as,arrSize2:as2,init,line:ln});
     }while(this._pk().v===',');
     if(!noSemi)this._ex(';');
     return{type:'decl',varType:vt,decls,ln};
@@ -1881,17 +1895,17 @@ class CInterpreter {
   }
 
   _parsePrim(){
-    const t=this._nx();
-    if(t.t==='num')return{type:'lit',v:t.v};
-    if(t.t==='str')return{type:'slit',v:t.v};
-    if(t.t==='char')return{type:'clit',v:t.v};
-    if(t.t==='id'){if(t.v==='NULL')return{type:'lit',v:null};if(t.v==='true')return{type:'lit',v:1};if(t.v==='false')return{type:'lit',v:0};return{type:'id',n:t.v,ln:t.ln};}
-    if(t.v==='{'){
-      let depth=1;while(depth>0&&this._pk().t!=='eof'){if(this._pk().v==='{')depth++;if(this._pk().v==='}')depth--;this._nx();}
-      return{type:'lit',v:0};
-    }
-    return{type:'lit',v:0};
+  const t=this._nx();
+  if(t.t==='num')return{type:'lit',v:t.v,isFloat:!!t.isFloat, ln:t.ln};
+  if(t.t==='str')return{type:'slit',v:t.v, ln:t.ln};
+  if(t.t==='char')return{type:'clit',v:t.v, ln:t.ln};
+  if(t.t==='id'){if(t.v==='NULL')return{type:'lit',v:null, ln:t.ln};if(t.v==='true')return{type:'lit',v:1, ln:t.ln};if(t.v==='false')return{type:'lit',v:0, ln:t.ln};return{type:'id',n:t.v,ln:t.ln};}
+  if(t.v==='{'){
+    let depth=1;while(depth>0&&this._pk().t!=='eof'){if(this._pk().v==='{')depth++;if(this._pk().v==='}')depth--;this._nx();}
+    return{type:'lit',v:0, ln:t.ln};
   }
+  return{type:'lit',v:0, ln:t.ln};
+}
 
   _initGlobals(){
     for(const [name,g] of Object.entries(this.globals)){
@@ -1915,12 +1929,115 @@ class CInterpreter {
       this._globalFrame.vars[name]={type:g.type,value:val,addr:this._nextAddr(),seg:g.init?'data':'bss'};
     }
   }
+
+  _literalKind(node){
+  if(!node) return null;
+  if(node.type==='slit') return 'string';
+  if(node.type==='clit') return 'char';
+  if(node.type==='lit'){
+    if(node.v===null) return null;
+    return node.isFloat ? 'float' : 'int';
+  }
+  if(node.type==='un' && node.op==='-') {
+    const inner = this._literalKind(node.x);
+    if(inner && node.x) {
+      if(node.x.ln) node.ln = node.x.ln;
+    }
+    return inner;
+  }
+  return null;
+}
+
+  _checkHomogeneous(node){
+  const kinds=new Set();
+  const kindLines = {};
+  for(const it of node.items){
+    if(it && it.type==='arrlit') continue;
+    const k=this._literalKind(it);
+    if(k) {
+      if(!kindLines[k]) kindLines[k] = [];
+      kindLines[k].push(it.ln || '?');
+      kinds.add(k);
+    }
+  }
+  if(kinds.size>1){
+    const mixedKinds = Array.from(kinds);
+    const firstKind = mixedKinds[0];
+    const secondKind = mixedKinds[1];
+    const lineNum = kindLines[secondKind] ? kindLines[secondKind][0] : (kindLines[firstKind] ? kindLines[firstKind][0] : '?');
+    throw new Error(`use homogeneous data in array line at ${lineNum}`);
+  }
+}
+
   _flattenInit(node,frame){
     if(node&&node.type==='arrlit'){
+      this._checkHomogeneous(node);
       return node.items.map(it=>it.type==='arrlit'?this._flattenInit(it,frame):this._eval(it,frame));
     }
     if(node&&node.type==='slit'){const v=node.v.split('').map(c=>c.charCodeAt(0));v.push(0);return v;}
     const v=this._eval(node,frame);return Array.isArray(v)?v:[v];
+  }
+
+  _validateVariable(name, line, frame) {
+    if (frame && frame.vars && frame.vars[name] !== undefined) {
+      return true;
+    }
+    if (this._globalFrame.vars[name] !== undefined) {
+      return true;
+    }
+    const currentFn = this._callStack.length > 0 ? this._callStack[this._callStack.length-1] : null;
+    if (currentFn && currentFn.vars && currentFn.vars[name] !== undefined) {
+      return true;
+    }
+    if (this.functions[name]) {
+      return true;
+    }
+    if (this.structs[name]) {
+      return true;
+    }
+    throw new Error(`'${name}' undeclared (first use in this function) near line ${line}`);
+  }
+
+  _checkRedeclaration(name, frame, line) {
+    if (frame && frame.vars && frame.vars[name] !== undefined) {
+      throw new Error(`redeclaration of '${name}' with no linkage near line ${line}`);
+    }
+    const currentFn = this._callStack.length > 0 ? this._callStack[this._callStack.length-1] : null;
+    if (currentFn && currentFn.name && this._functionScopes[currentFn.name]) {
+      if (this._functionScopes[currentFn.name].has(name)) {
+        throw new Error(`redeclaration of '${name}' with no linkage near line ${line}`);
+      }
+    }
+  }
+
+  _validateExprVariables(node, frame) {
+    if (!node) return;
+    if (node.type === 'id') {
+      const name = node.n;
+      if (this.functions[name]) return;
+      if (['printf','scanf','strlen','strcpy','strncpy','strcat','strncat','strcmp','strncmp',
+           'malloc','calloc','realloc','free','sizeof','toupper','tolower','isdigit','isalpha',
+           'isspace','abs','fabs','labs','sqrt','cbrt','pow','floor','ceil','round','trunc',
+           'fmod','fmin','fmax','hypot','exp','exp2','log','log2','log10','sin','cos','tan',
+           'asin','acos','atan','atan2','sinh','cosh','tanh','asinh','acosh','atanh','rand',
+           'srand','atoi','atof','putchar','puts','exit','fopen','fclose','fprintf','fgets',
+           'va_start','va_arg','va_end'].includes(name)) return;
+      this._validateVariable(name, node.ln || 0, frame);
+      return;
+    }
+    for (const key of Object.keys(node)) {
+      if (key === 'type' || key === 'ln') continue;
+      const child = node[key];
+      if (Array.isArray(child)) {
+        for (const item of child) {
+          if (item && typeof item === 'object') {
+            this._validateExprVariables(item, frame);
+          }
+        }
+      } else if (child && typeof child === 'object') {
+        this._validateExprVariables(child, frame);
+      }
+    }
   }
 
   _run(){
@@ -1938,6 +2055,10 @@ class CInterpreter {
     fn.params.forEach((p,i)=>{
       if(p.isVariadic){ frame._variadicArgs = args.slice(i); return; }
       frame.vars[p.name]={type:p.type,value:args[i]??0,addr:this._nextAddr(),isParam:true,seg:'stack'};
+      this._declaredVars.add(p.name);
+      if (this._functionScopes[name]) {
+        this._functionScopes[name].add(p.name);
+      }
     });
     this._callStack.push(frame);
     if(this._callStack.length>200) throw new Error('Stack overflow — possible infinite recursion in '+name+'()');
@@ -1969,9 +2090,12 @@ class CInterpreter {
 
   _execDecl(s,frame){
     for(const d of s.decls){
+      this._checkRedeclaration(d.name, frame, s.ln);
+      
       let val;const vt=s.varType;
       if(vt==='va_list'){
         frame.vars[d.name]={type:'va_list',value:'<va_list>',addr:this._nextAddr(),seg:'stack',_vaIdx:0};
+        this._declaredVars.add(d.name);
         this._addStep({ln:s.ln,desc:`Declare <code>va_list ${d.name}</code> (variadic arg list)`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d.name});
         continue;
       }
@@ -1982,8 +2106,6 @@ class CInterpreter {
       if(d.isArr){
         const sz=d.arrSize?this._eval(d.arrSize,frame):0;
         if(d.arrSize2){
-          // ── 2D array declaration (handles both `int a[2][2];` and `int a[2][2] = {1,2,3,4};`
-          //    as well as nested `{{1,2},{3,4}}` initializers) ──
           const sz2=this._eval(d.arrSize2,frame);
           if(d.init){
             const flat=this._flattenInit(d.init,frame);
@@ -1997,7 +2119,6 @@ class CInterpreter {
                 rows.push(row);
               }
             } else {
-              // Flat initializer list (e.g. {1,2,3,4}) — reshape row-major into sz x sz2
               if(flat.length>sz*sz2){
                 throw new Error(`initializer for array '${d.name}' has too many elements for size [${sz}][${sz2}] (line ${s.ln})`);
               }
@@ -2029,6 +2150,10 @@ class CInterpreter {
       }
       const entry={type:vt,value:val,addr:this._nextAddr(),changed:true,seg:s.isStatic?'static':'stack'};
       frame.vars[d.name]=entry;
+      this._declaredVars.add(d.name);
+      if (frame.name && this._functionScopes[frame.name]) {
+        this._functionScopes[frame.name].add(d.name);
+      }
       if(s.isStatic) this._staticStore[frame.name+'::'+d.name]=entry;
       this._addStep({ln:s.ln,desc:`Declare <code>${s.isStatic?'static ':''}${vt} ${d.name}</code>${d.init?` = <b>${this._fv(val, vt)}</b>`:''}`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d.name});
       frame.vars[d.name].changed=false;
@@ -2036,6 +2161,7 @@ class CInterpreter {
   }
 
   _execExprStmt(s,frame){
+    this._validateExprVariables(s.expr, frame);
     const v=this._eval(s.expr,frame);
     const e=s.expr;
     if(e.type==='bin'&&['=','+=','-=','*=','/=','%='].includes(e.op)){
@@ -2049,12 +2175,19 @@ class CInterpreter {
   _exprName(e){ if(!e)return'?'; if(e.type==='id')return e.n; if(e.type==='sub')return this._exprName(e.x); if(e.type==='mem')return this._exprName(e.x); if(e.type==='deref')return this._exprName(e.x); return '?'; }
 
   _execRet(s,frame){
-    const v=s.val?this._eval(s.val,frame):undefined;
-    this._addStep({ln:s.ln,desc:`return <b>${v!==undefined?this._fv(v):'void'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
-    throw{type:'ret',val:v};
+    if (s.val) {
+      this._validateExprVariables(s.val, frame);
+      const v=this._eval(s.val,frame);
+      this._addStep({ln:s.ln,desc:`return <b>${v!==undefined?this._fv(v):'void'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+      throw{type:'ret',val:v};
+    } else {
+      this._addStep({ln:s.ln,desc:`return void`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+      throw{type:'ret',val:undefined};
+    }
   }
 
   _execIf(s,frame){
+    this._validateExprVariables(s.cond, frame);
     const c=this._eval(s.cond,frame);
     this._addStep({ln:s.ln,desc:`<b>if</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
     if(c)this._execStmt(s.then,frame);else if(s.else)this._execStmt(s.else,frame);
@@ -2063,6 +2196,7 @@ class CInterpreter {
   _execWhile(s,frame){
     let iter=0;
     while(iter++<2000){
+      this._validateExprVariables(s.cond, frame);
       const c=this._eval(s.cond,frame);
       this._addStep({ln:s.ln,desc:`<b>while</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
       if(!c)break;
@@ -2071,12 +2205,23 @@ class CInterpreter {
   }
 
   _execFor(s,frame){
-    if(s.init){if(s.init.type==='decl')this._execDecl(s.init,frame);else this._eval(s.init,frame);}
+    if(s.init){if(s.init.type==='decl')this._execDecl(s.init,frame);else {
+      this._validateExprVariables(s.init, frame);
+      this._eval(s.init,frame);
+    }}
     let iter=0;
     while(iter++<2000){
-      if(s.cond){const c=this._eval(s.cond,frame);this._addStep({ln:s.ln,desc:`<b>for</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});if(!c)break;}
+      if(s.cond){
+        this._validateExprVariables(s.cond, frame);
+        const c=this._eval(s.cond,frame);
+        this._addStep({ln:s.ln,desc:`<b>for</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+        if(!c)break;
+      }
       try{this._execStmt(s.body,frame);}catch(e){if(e.type==='break')break;if(e.type!=='cont')throw e;}
-      if(s.update)this._eval(s.update,frame);
+      if(s.update){
+        this._validateExprVariables(s.update, frame);
+        this._eval(s.update,frame);
+      }
     }
   }
 
@@ -2084,6 +2229,7 @@ class CInterpreter {
     let iter=0;
     do{
       try{this._execStmt(s.body,frame);}catch(e){if(e.type==='break')break;if(e.type!=='cont')throw e;}
+      this._validateExprVariables(s.cond, frame);
       const c=this._eval(s.cond,frame);
       this._addStep({ln:s.ln,desc:`<b>do-while</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
       if(!c)break;
@@ -2091,12 +2237,19 @@ class CInterpreter {
   }
 
   _execSwitch(s,frame){
+    this._validateExprVariables(s.disc, frame);
     const dv=this._eval(s.disc,frame);
     this._addStep({ln:s.ln,desc:`<b>switch</b> on value <b>${this._fv(dv)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
     let matched=false;
     try{
       for(const c of s.cases){
-        if(!matched){ if(c.isDefault) matched=true; else if(this._eval(c.val,frame)===dv) matched=true; }
+        if(!matched){ 
+          if(c.isDefault) matched=true; 
+          else {
+            this._validateExprVariables(c.val, frame);
+            if(this._eval(c.val,frame)===dv) matched=true; 
+          }
+        }
         if(matched){ this._execBlock(c.body,frame); }
       }
     }catch(e){ if(e.type!=='break') throw e; }
@@ -2112,6 +2265,7 @@ class CInterpreter {
       case 'sizeof':return e.tp?this._szType(e.tp):this._szOf(this._eval(e.x,frame));
       case 'id': {
         const n=e.n;
+        if (this.functions[n]) return n;
         for(let i=this._callStack.length-1;i>=0;i--){if(this._callStack[i].vars[n]!==undefined)return this._callStack[i].vars[n].value;}
         if(this._globalFrame.vars[n]!==undefined)return this._globalFrame.vars[n].value;
         return 0;
@@ -2260,7 +2414,10 @@ class CInterpreter {
 
   _evalCall(e,frame){
     const fnName=e.fn.n||(e.fn.type==='id'?e.fn.n:'?');
-    const args=e.args.map(a=>this._eval(a,frame));
+    const args=e.args.map(a=>{
+      this._validateExprVariables(a, frame);
+      return this._eval(a,frame);
+    });
     const ln=e.fn.ln||1;
 
     if(fnName==='va_start'){
@@ -2439,11 +2596,6 @@ class CInterpreter {
       const parsed = (spec==='%f' || spec==='%lf' || spec==='%g')
         ? (parseFloat(raw) || 0) : (parseInt(raw) || 0);
 
-      // Write the parsed value to wherever `addr` points.
-      // For plain variables (&x) `addr` matches a var's own address directly.
-      // For array elements / struct members reached through &expr (e.g. &num[i][j]),
-      // `_addrOf` records a getter/setter closure in `this._addrCells` keyed by `addr` —
-      // that must be checked too, otherwise scanf into array cells silently does nothing.
       let wrote=false;
       if(this._addrCells && this._addrCells[addr]){
         this._addrCells[addr].set(parsed);
@@ -2621,21 +2773,20 @@ const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), 
 cmEditor.setValue(SAMPLES.memory_layout);
 cmEditor.setSize('100%', '100%');
 
-// ── Element refs — IDs match the HTML above ──────────────────────────────────
+// ── Element refs ─────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const runBtn = $('run-btn'), resetBtn = $('reset-btn'), clearBtn = $('clear-btn');
 const prevBtn = $('prev-btn'), nextBtn = $('next-btn');
 const playBtn = $('play-btn'), pauseBtn = $('pause-btn');
 const stepInfo = $('step-info'), speedSlider = $('speed');
 const sampleSel = $('sample-sel');
-// FIX: use the correct IDs that exist in this HTML
-const framesEl  = $('frames-pane');   // was frames-pane in script, now correct
+const framesEl  = $('frames-pane');
 const heapSec   = $('heap-section');
 const heapBlocks= $('heap-blocks');
 const outputArea= $('output-area');
 const stdinIn   = $('stdin-in'), stdinBtn = $('stdin-btn');
-const csEl      = $('cs-pane');       // was cs-pane in script, now correct
-const mmEl      = $('mm-pane');       // was mm-pane in script, now correct
+const csEl      = $('cs-pane');
+const mmEl      = $('mm-pane');
 const walkEl    = $('walkthrough');
 const sbDot = $('sb-dot'), sbTxt = $('sb-txt'), sbLine = $('sb-line'), sbStep = $('sb-step'), sbFrames = $('sb-frames');
 
