@@ -2139,7 +2139,7 @@ class CInterpreter {
           val=this._flattenInit(d.init,frame);
           if(d.arrSize){
             if(val.length>sz){
-              throw new Error(`initializer-string for char array '${d.name}' is too long for the specified size (line ${s.ln}) — increase your array size`);
+              throw new Error(`initializer for array '${d.name}' is too long for the specified size (line ${s.ln}) — increase your array size`);
             }
             while(val.length<sz) val.push(0);
           }
