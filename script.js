@@ -1965,7 +1965,7 @@ class CInterpreter {
     const firstKind = mixedKinds[0];
     const secondKind = mixedKinds[1];
     const lineNum = kindLines[secondKind] ? kindLines[secondKind][0] : (kindLines[firstKind] ? kindLines[firstKind][0] : '?');
-    throw new Error(`use homogeneous data in array line at ${lineNum}`);
+    throw new Error(`Use homogeneous data in array line at ${lineNum}`);
   }
 }
 
