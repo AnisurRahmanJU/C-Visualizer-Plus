@@ -2822,20 +2822,6 @@ function segBadge(seg) {
   return `<span class="seg-badge ${seg}">${labels[seg] || seg}</span>`;
 }
 
-/*function buildArrCellsHtml(val, type, isChar, initArr) {
-  const charMode = isChar || (type && type.includes('char'));
-  let html = '<div class="arr-row">';
-  val.forEach((c, ci) => {
-    const num = Number(c) || 0;
-    const isInit = !initArr || initArr[ci] !== false;
-    let glyph;
-    if (charMode) {
-      if (num === 0) glyph = isInit ? '\\0' : '?';
-      else glyph = (num >= 32 && num < 127 ? String.fromCharCode(num) : '·');
-    } else {
-      glyph = isInit ? String(num) : '?';
-    }*/
-
 function buildArrCellsHtml(val, type, isChar, initArr) {
   const charMode = isChar || (type && type.includes('char'));
   let html = '<div class="arr-row">';
@@ -2849,7 +2835,6 @@ function buildArrCellsHtml(val, type, isChar, initArr) {
     } else {
       glyph = isInit ? String(num) : '?';
     }
-    // ==============================================================================
     const binStr = toBinaryStr(num, charMode ? 'char' : (type || 'int'));
     html += `<div class="arr-cell" title="dec:${num}&#10;bin:${binStr}${isInit?'':'&#10;(uninit)'}"><span style="font-size:11px">${String(glyph).replace(/</g,'&lt;')}</span><span class="ac-bin">${toBinaryHtml(num, charMode ? 'char' : (type || 'int'))}</span><span style="display:block;margin-top:1px;font-size:8px;color:var(--text3);text-align:center">[${ci}]</span></div>`;
   });
