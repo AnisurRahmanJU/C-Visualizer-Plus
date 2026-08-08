@@ -1627,20 +1627,6 @@ class CInterpreter {
   _ex(v){const t=this._nx();if(t.v!==v)throw new Error(`Expected '${v}' got '${t.v}' near line ${t.ln}`);return t;}
   _isType(v){return['int','float','double','char','void','long','short','unsigned','struct','const','size_t','signed','va_list'].includes(v);}
 
-  // ── Semicolon enforcement ────────────────────────────────────────────────
-  // Requires a ';' at the current token position. If missing, throws a clear
-  // "missing semicolon" syntax error referencing the line where it was expected
-  // (preferring the line of the previous, already-consumed token, since that's
-  // where a human would look for the missing ';').
-  _expectSemi(ctxLine) {
-    if (this._pk().v === ';') { this._nx(); return; }
-    const prevTok = this.tokens[this._ti - 1];
-    const ln = (prevTok && prevTok.ln) || ctxLine || this._pk().ln || '?';
-    const nextTok = this._pk();
-    const foundDesc = nextTok.t === 'eof' ? 'end of file' : `'${nextTok.v}'`;
-    throw new Error(`Missing semicolon ';' - expected at line ${ln} (found ${foundDesc} instead)`);
-  }
-
   _buildAST(){
     while(this._pk().t!=='eof'){
       const t=this._pk();
@@ -1749,8 +1735,8 @@ class CInterpreter {
     if(t.v==='for')return this._parseFor();
     if(t.v==='do')return this._parseDo();
     if(t.v==='switch')return this._parseSwitch();
-    if(t.v==='break'){this._nx();this._expectSemi(t.ln);return{type:'break',ln:t.ln};}
-    if(t.v==='continue'){this._nx();this._expectSemi(t.ln);return{type:'continue',ln:t.ln};}
+    if(t.v==='break'){this._nx();this._ex(';');return{type:'break',ln:t.ln};}
+    if(t.v==='continue'){this._nx();this._ex(';');return{type:'continue',ln:t.ln};}
     if(t.t==='pp'){this._nx();return null;}
     if(t.v===';'){this._nx();return null;}
     if(t.v==='static'){
@@ -1762,23 +1748,23 @@ class CInterpreter {
     if(t.v==='struct'||this._isType(t.v)){
       const save=this._ti;
       try { return this._parseDecl(); }
-      catch(e) { this._ti=save; const e2=this._parseExpr(); this._expectSemi(t.ln); return{type:'expr',expr:e2,ln:t.ln}; }
+      catch(e) { this._ti=save; const e2=this._parseExpr(); this._ex(';'); return{type:'expr',expr:e2,ln:t.ln}; }
     }
-    const e=this._parseExpr();this._expectSemi(t.ln);return{type:'expr',expr:e,ln:t.ln};
+    const e=this._parseExpr();this._ex(';');return{type:'expr',expr:e,ln:t.ln};
   }
 
-  _parseReturn(){const ln=this._pk().ln;this._ex('return');let v=null;if(this._pk().v!==';')v=this._parseExpr();this._expectSemi(ln);return{type:'return',val:v,ln};}
+  _parseReturn(){const ln=this._pk().ln;this._ex('return');let v=null;if(this._pk().v!==';')v=this._parseExpr();this._ex(';');return{type:'return',val:v,ln};}
   _parseIf(){const ln=this._pk().ln;this._ex('if');this._ex('(');const c=this._parseExpr();this._ex(')');const th=this._parseStmt();let el=null;if(this._pk().v==='else'){this._nx();el=this._parseStmt();}return{type:'if',cond:c,then:th,else:el,ln};}
   _parseWhile(){const ln=this._pk().ln;this._ex('while');this._ex('(');const c=this._parseExpr();this._ex(')');const b=this._parseStmt();return{type:'while',cond:c,body:b,ln};}
   _parseFor(){
     const ln=this._pk().ln;this._ex('for');this._ex('(');
     let ini=null,cond=null,upd=null;
-    if(this._pk().v!==';'){if(this._isType(this._pk().v)||this._pk().v==='struct'){ini=this._parseDecl(true);this._expectSemi(ln);}else{ini=this._parseExpr();this._expectSemi(ln);}}else this._nx();
-    if(this._pk().v!==';')cond=this._parseExpr();this._expectSemi(ln);
+    if(this._pk().v!==';'){if(this._isType(this._pk().v)||this._pk().v==='struct'){ini=this._parseDecl(true);this._ex(';');}else{ini=this._parseExpr();this._ex(';');}}else this._ex(';');
+    if(this._pk().v!==';')cond=this._parseExpr();this._ex(';');
     if(this._pk().v!==')')upd=this._parseExpr();this._ex(')');const b=this._parseStmt();
     return{type:'for',init:ini,cond,update:upd,body:b,ln};
   }
-  _parseDo(){const ln=this._pk().ln;this._ex('do');const b=this._parseStmt();this._ex('while');this._ex('(');const c=this._parseExpr();this._ex(')');this._expectSemi(ln);return{type:'do',cond:c,body:b,ln};}
+  _parseDo(){const ln=this._pk().ln;this._ex('do');const b=this._parseStmt();this._ex('while');this._ex('(');const c=this._parseExpr();this._ex(')');this._ex(';');return{type:'do',cond:c,body:b,ln};}
 
   _parseSwitch(){
     const ln=this._pk().ln;this._ex('switch');this._ex('(');const disc=this._parseExpr();this._ex(')');this._ex('{');
@@ -1813,7 +1799,7 @@ class CInterpreter {
       if(this._pk().v==='='){this._nx();init=this._parse2DInit();}
       decls.push({name,isArr:ia,arrSize:as,arrSize2:as2,init});
     }while(this._pk().v===',');
-    if(!noSemi) this._expectSemi(ln);
+    if(!noSemi)this._ex(';');
     return{type:'decl',varType:vt,decls,ln};
   }
 
