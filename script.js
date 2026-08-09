@@ -3140,16 +3140,45 @@ function renderHeap(heap) {
   heapBlocks.innerHTML = '';
   for (const [addr, block] of Object.entries(heap)) {
     const d = document.createElement('div'); d.className = 'heap-block';
+    const hasStructData = block.data && Object.keys(block.data).length > 0;
     const head = document.createElement('div');
     head.className = 'hb-head';
-    head.innerHTML = `<i class="fa-solid fa-microchip" style="color:var(--vsc-orange);font-size:11px"></i><span class="h-addr">${addr}</span><span class="h-sz">${block.size} bytes</span>${segBadge('heap')}<span class="h-sz">${block.isChar ? 'char buffer' : 'int buffer'}</span>`;
+    head.innerHTML = `<i class="fa-solid fa-microchip" style="color:var(--vsc-orange);font-size:11px"></i><span class="h-addr">${addr}</span><span class="h-sz">${block.size} bytes</span>${segBadge('heap')}<span class="h-sz">${hasStructData ? 'struct' : (block.isChar ? 'char buffer' : 'int buffer')}</span>`;
     d.appendChild(head);
-    if (block.arr && block.arr.length) {
+
+    if (hasStructData) {
+      // Struct-backed heap block (linked list / tree / stack node, etc.)
+      // Fields are written via the `->` (pmem) path into block.data, not block.arr.
+      const body = document.createElement('div');
+      body.className = 'hb-body';
+      const tbl = document.createElement('table');
+      tbl.className = 'vtbl';
+      tbl.innerHTML = `<thead><tr><th>Field</th><th>Value</th></tr></thead>`;
+      const tb = document.createElement('tbody');
+      for (const [fname, fval] of Object.entries(block.data)) {
+        const tr = document.createElement('tr');
+        const isPtrVal = typeof fval === 'string' && fval.startsWith('0x');
+        let vhtml;
+        if (fval === null) {
+          vhtml = `<span class="vv vptr">NULL</span>`;
+        } else if (isPtrVal) {
+          vhtml = `<span class="vv vptr"><i class="fa-solid fa-link" style="font-size:10px"></i> ${fval}</span>`;
+        } else {
+          vhtml = `<span class="vv">${String(fval).replace(/</g,'&lt;')}</span>`;
+        }
+        tr.innerHTML = `<td><span class="vn">${fname}</span></td><td>${vhtml}</td>`;
+        tb.appendChild(tr);
+      }
+      tbl.appendChild(tb);
+      body.appendChild(tbl);
+      d.appendChild(body);
+    } else if (block.arr && block.arr.length) {
       const body = document.createElement('div');
       body.className = 'hb-body';
       body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar, block.init);
       d.appendChild(body);
     }
+
     heapBlocks.appendChild(d);
   }
 }
