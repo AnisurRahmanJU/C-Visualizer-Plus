@@ -1730,7 +1730,7 @@ class CInterpreter {
       this._ex(';');
       for(const d of decls) {
         if (this._globalFrame.vars[d.name] !== undefined) {
-          throw new Error(`redeclaration of '${d.name}' with no linkage near line ${this._pk().ln}`);
+          throw new Error(`error: redefinition of '${d.name}' (line ${this._pk().ln})`);
         }
         this.globals[d.name]={type,name:d.name,init:d.init,isArr:d.isArr,arrSize:d.arrSize};
         this._declaredVars.add(d.name);
@@ -1995,7 +1995,7 @@ class CInterpreter {
     if (this.structs[name]) {
       return true;
     }
-    throw new Error(`'${name}' undeclared (first use in this function) near line ${line}`);
+    throw new Error(`error: '${name}' undeclared (first use in this function) (line ${line})`);
   }
 
   _checkRedeclaration(name, frame, line, declNode) {
@@ -2003,7 +2003,12 @@ class CInterpreter {
       if (declNode && frame.vars[name]._declNode === declNode) {
         return; // same loop-body decl re-running on a new iteration — OK
       }
-      throw new Error(`redeclaration of '${name}' with no linkage near line ${line}`);
+      // Matches real GCC/Clang wording for this exact error, e.g.:
+      //   error: redefinition of 'a'
+      //   note: previous definition of 'a' was here
+      const prevLine = frame.vars[name]._declNode ? frame.vars[name]._declNode.line : null;
+      const noteStr = prevLine ? `<br>note: previous definition of '${name}' was here (line ${prevLine})` : '';
+      throw new Error(`error: redefinition of '${name}' (line ${line})${noteStr}`);
     }
   }
 
