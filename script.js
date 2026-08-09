@@ -2480,13 +2480,17 @@ class CInterpreter {
       case 'strcpy':case 'strncpy':{
         let s = this._readCString(args[1]);
         if(fnName==='strncpy'&&args[2]!==undefined) s=s.slice(0,args[2]);
-        this._writeCString(args[0], s); return args[0];
+        this._writeCString(args[0], s);
+        this._addStep({ln,desc:`<code>${fnName}(...)</code> &rarr; wrote <b>"${s.replace(/</g,'&lt;')}"</b> into the array (see cells below)`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+        return args[0];
       }
       case 'strcat':case 'strncat':{
         const destLen=this._cstrLen(args[0]);
         let s=this._readCString(args[1]);
         if(fnName==='strncat'&&args[2]!==undefined) s=s.slice(0,args[2]);
-        this._writeCString(args[0], s, destLen); return args[0];
+        this._writeCString(args[0], s, destLen);
+        this._addStep({ln,desc:`<code>${fnName}(...)</code> &rarr; appended <b>"${s.replace(/</g,'&lt;')}"</b> to the array (see cells below)`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+        return args[0];
       }
       case 'strcmp':case 'strncmp':{
         let a=this._readCString(args[0]), b=this._readCString(args[1]);
