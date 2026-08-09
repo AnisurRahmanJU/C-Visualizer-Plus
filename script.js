@@ -171,8 +171,8 @@ int main() {
 hello:`#include <stdio.h>
 
 int main() {
-    printf("Hello, World!\\n");
-    printf("Welcome to C Visualizer!\\n");
+    printf("Hello! I am Md. Anisur Rahman.\\n");
+    printf("Welcome to our C Visualizer Plus!\\n");
     return 0;
 }`,
 variables:`#include <stdio.h>
@@ -1697,7 +1697,6 @@ class CInterpreter {
   }
 
   _parseTopLevel(){
-    const declLn=this._pk().ln;
     const type=this._parseType();const name=this._nx().v;
     if(this._pk().v==='('){
       this._ex('(');const params=[];
@@ -1730,10 +1729,10 @@ class CInterpreter {
       }
       this._ex(';');
       for(const d of decls) {
-        if (this.globals[d.name] !== undefined) {
-          throw new Error(`${d.name} is already declared at line ${this.globals[d.name].line}`);
+        if (this._globalFrame.vars[d.name] !== undefined) {
+          throw new Error(`redeclaration of '${d.name}' with no linkage near line ${this._pk().ln}`);
         }
-        this.globals[d.name]={type,name:d.name,init:d.init,isArr:d.isArr,arrSize:d.arrSize,line:declLn};
+        this.globals[d.name]={type,name:d.name,init:d.init,isArr:d.isArr,arrSize:d.arrSize};
         this._declaredVars.add(d.name);
       }
     }
@@ -1999,39 +1998,12 @@ class CInterpreter {
     throw new Error(`'${name}' undeclared (first use in this function) near line ${line}`);
   }
 
-  // FIX: Previously this also consulted `this._functionScopes[currentFn.name]`,
-  // a Set keyed only by the function's NAME that persisted across separate
-  // invocations of that function (including recursive calls, and any helper
-  // called more than once — e.g. `newNode()` in the linked-list/tree/stack
-  // samples). Because that set was never reset per-call, the SECOND time a
-  // function declared a local variable (even a perfectly valid, freshly
-  // scoped local like `struct Node *n`), it looked like the name was already
-  // declared and threw a false "redeclaration" error. Real redeclaration
-  // within a single call is already caught correctly by checking `frame.vars`
-  // (which is fresh for every call and already contains the function's
-  // parameters), so the extra persistent check is removed.
-  //
-  // SECOND FIX: `_execBlock` does NOT create a new lexical scope — a block
-  // statement (e.g. a `for`/`while` loop body, or an `{ ... }` compound
-  // statement) is executed against the SAME `frame` object every time it
-  // runs. That's correct for things declared once, but a loop body that
-  // declares a local on every iteration (e.g. `char temp = s[i];` inside a
-  // `for` loop) re-executes the very same `decl` AST node many times against
-  // that same frame, and used to be flagged as an illegal redeclaration on
-  // the 2nd+ iteration even though it is perfectly valid, block-scoped C.
-  // To fix this without a full scope-chain rewrite, each declared variable
-  // now remembers *which AST decl node* declared it (`_declNode`). When the
-  // same node re-declares the same name (i.e. we're just re-entering the
-  // same loop iteration's scope), we allow it — the variable is simply reset.
-  // Only a genuinely different declaration statement re-using the same name
-  // is treated as a real redeclaration error.
   _checkRedeclaration(name, frame, line, declNode) {
     if (frame && frame.vars && frame.vars[name] !== undefined) {
       if (declNode && frame.vars[name]._declNode === declNode) {
         return; // same loop-body decl re-running on a new iteration — OK
       }
-      const firstLine = frame.vars[name]._declLine ?? line;
-      throw new Error(`${name} is already declared at line ${firstLine}`);
+      throw new Error(`redeclaration of '${name}' with no linkage near line ${line}`);
     }
   }
 
@@ -2119,7 +2091,7 @@ class CInterpreter {
       
       let val;const vt=s.varType;
       if(vt==='va_list'){
-        frame.vars[d.name]={type:'va_list',value:'<va_list>',addr:this._nextAddr(),seg:'stack',_vaIdx:0,_declNode:d,_declLine:s.ln};
+        frame.vars[d.name]={type:'va_list',value:'<va_list>',addr:this._nextAddr(),seg:'stack',_vaIdx:0,_declNode:d};
         this._declaredVars.add(d.name);
         this._addStep({ln:s.ln,desc:`Declare <code>va_list ${d.name}</code> (variadic arg list)`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d.name});
         continue;
@@ -2173,7 +2145,7 @@ class CInterpreter {
       } else {
         val=d.init?(d.init.type==='arrlit'?this._flattenInit(d.init,frame):this._eval(d.init,frame)):0;
       }
-      const entry={type:vt,value:val,addr:this._nextAddr(),changed:true,seg:s.isStatic?'static':'stack',_declNode:d,_declLine:s.ln};
+      const entry={type:vt,value:val,addr:this._nextAddr(),changed:true,seg:s.isStatic?'static':'stack',_declNode:d};
       frame.vars[d.name]=entry;
       this._declaredVars.add(d.name);
       if (frame.name && this._functionScopes[frame.name]) {
@@ -2503,31 +2475,18 @@ class CInterpreter {
     switch(fnName){
       case 'printf':  return this._printf(args,e.fn);
       case 'scanf':   return this._scanf(args,e.fn,frame);
-      case 'sprintf': {
-        const fmt=args[1]||'';
-        const out=this._sprintfFmt(fmt,args.slice(2));
-        this._writeCString(args[0], out);
-        const destName1=this._exprName(e.args[0]);
-        this._addStep({ln,desc:`<code>sprintf(${destName1}, ...)</code> &rarr; wrote <b>"${out.replace(/\n/g,'↵').replace(/</g,'&lt;').slice(0,60)}"</b> into buffer`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
-        return out.length;
-      }
+      case 'sprintf': {const fmt=args[1]||'';const out=this._sprintfFmt(fmt,args.slice(2));return out.length;}
       case 'strlen':  return this._cstrLen(args[0]);
       case 'strcpy':case 'strncpy':{
         let s = this._readCString(args[1]);
         if(fnName==='strncpy'&&args[2]!==undefined) s=s.slice(0,args[2]);
-        this._writeCString(args[0], s);
-        const destName2=this._exprName(e.args[0]);
-        this._addStep({ln,desc:`<code>${fnName}(${destName2}, "${s.replace(/\n/g,'↵').replace(/</g,'&lt;')}")</code> &rarr; buffer updated`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
-        return args[0];
+        this._writeCString(args[0], s); return args[0];
       }
       case 'strcat':case 'strncat':{
         const destLen=this._cstrLen(args[0]);
         let s=this._readCString(args[1]);
         if(fnName==='strncat'&&args[2]!==undefined) s=s.slice(0,args[2]);
-        this._writeCString(args[0], s, destLen);
-        const destName3=this._exprName(e.args[0]);
-        this._addStep({ln,desc:`<code>${fnName}(${destName3}, "${s.replace(/\n/g,'↵').replace(/</g,'&lt;')}")</code> &rarr; appended to buffer`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
-        return args[0];
+        this._writeCString(args[0], s, destLen); return args[0];
       }
       case 'strcmp':case 'strncmp':{
         let a=this._readCString(args[0]), b=this._readCString(args[1]);
@@ -3155,16 +3114,60 @@ function renderHeap(heap) {
   heapBlocks.innerHTML = '';
   for (const [addr, block] of Object.entries(heap)) {
     const d = document.createElement('div'); d.className = 'heap-block';
+    // FIX: previously this checked `Object.keys(block.data).length > 0`, which
+    // misclassified plain char/int buffers as "struct" blocks the moment
+    // strcpy() wrote into them — because _writeCString() also stashes a
+    // convenience `data.text` string for display purposes. That caused
+    // malloc'd char buffers (e.g. `malloc(30*sizeof(char))` + `strcpy(...)`)
+    // to render as a one-row "text" field table instead of the per-character
+    // array cells (which show '?' for uninitialized bytes and flip to the
+    // real character once written). Struct heap nodes (linked list / tree /
+    // stack, written via `->`) always have real field keys like 'data',
+    // 'next', 'left', 'right' — so excluding the 'text' key is enough to
+    // correctly separate the two cases.
+    const hasStructData = block.data && Object.keys(block.data).some(k => k !== 'text');
     const head = document.createElement('div');
     head.className = 'hb-head';
-    head.innerHTML = `<i class="fa-solid fa-microchip" style="color:var(--vsc-orange);font-size:11px"></i><span class="h-addr">${addr}</span><span class="h-sz">${block.size} bytes</span>${segBadge('heap')}<span class="h-sz">${block.isChar ? 'char buffer' : 'int buffer'}</span>`;
+    head.innerHTML = `<i class="fa-solid fa-microchip" style="color:var(--vsc-orange);font-size:11px"></i><span class="h-addr">${addr}</span><span class="h-sz">${block.size} bytes</span>${segBadge('heap')}<span class="h-sz">${hasStructData ? 'struct' : (block.isChar ? 'char buffer' : 'int buffer')}</span>`;
     d.appendChild(head);
-    if (block.arr && block.arr.length) {
+
+    if (hasStructData) {
+      // Struct-backed heap block (linked list / tree / stack node, etc.)
+      // Fields are written via the `->` (pmem) path into block.data, not block.arr.
+      const body = document.createElement('div');
+      body.className = 'hb-body';
+      const tbl = document.createElement('table');
+      tbl.className = 'vtbl';
+      tbl.innerHTML = `<thead><tr><th>Field</th><th>Value</th></tr></thead>`;
+      const tb = document.createElement('tbody');
+      for (const [fname, fval] of Object.entries(block.data)) {
+        const tr = document.createElement('tr');
+        const isPtrVal = typeof fval === 'string' && fval.startsWith('0x');
+        let vhtml;
+        if (fval === null) {
+          vhtml = `<span class="vv vptr">NULL</span>`;
+        } else if (isPtrVal) {
+          vhtml = `<span class="vv vptr"><i class="fa-solid fa-link" style="font-size:10px"></i> ${fval}</span>`;
+        } else {
+          vhtml = `<span class="vv">${String(fval).replace(/</g,'&lt;')}</span>`;
+        }
+        tr.innerHTML = `<td><span class="vn">${fname}</span></td><td>${vhtml}</td>`;
+        tb.appendChild(tr);
+      }
+      tbl.appendChild(tb);
+      body.appendChild(tbl);
+      d.appendChild(body);
+    } else if (block.arr && block.arr.length) {
+      // Plain char/int buffer (malloc/calloc/realloc). Renders every byte as
+      // a cell: '?' until that byte has actually been written (strcpy,
+      // indexing, etc.), then the real char/int value — exactly the
+      // "? → value" behavior requested.
       const body = document.createElement('div');
       body.className = 'hb-body';
       body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar, block.init);
       d.appendChild(body);
     }
+
     heapBlocks.appendChild(d);
   }
 }
@@ -3208,6 +3211,7 @@ function renderMM(frames, heap) {
   });
   mmEl.innerHTML = ''; mmEl.appendChild(grid);
 }
+
 
 function setStatus(type, msg) {
   sbDot.style.color = type === 'ok' ? '#23d18b' : type === 'error' ? '#f48771' : 'rgba(255,255,255,.7)';
