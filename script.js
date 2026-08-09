@@ -856,7 +856,7 @@ queue_linked_list:`#include <stdio.h>
 #include <stdlib.h>
 
 struct Node { int data; struct Node *next; };
-struct Node *front = NULL; *rear = NULL;
+struct Node *front = NULL, *rear = NULL;
 
 void enqueue(int val) {
     struct Node *n = (struct Node*)malloc(sizeof(struct Node));
@@ -1998,32 +1998,6 @@ class CInterpreter {
     throw new Error(`'${name}' undeclared (first use in this function) near line ${line}`);
   }
 
-  // FIX: Previously this also consulted `this._functionScopes[currentFn.name]`,
-  // a Set keyed only by the function's NAME that persisted across separate
-  // invocations of that function (including recursive calls, and any helper
-  // called more than once — e.g. `newNode()` in the linked-list/tree/stack
-  // samples). Because that set was never reset per-call, the SECOND time a
-  // function declared a local variable (even a perfectly valid, freshly
-  // scoped local like `struct Node *n`), it looked like the name was already
-  // declared and threw a false "redeclaration" error. Real redeclaration
-  // within a single call is already caught correctly by checking `frame.vars`
-  // (which is fresh for every call and already contains the function's
-  // parameters), so the extra persistent check is removed.
-  //
-  // SECOND FIX: `_execBlock` does NOT create a new lexical scope — a block
-  // statement (e.g. a `for`/`while` loop body, or an `{ ... }` compound
-  // statement) is executed against the SAME `frame` object every time it
-  // runs. That's correct for things declared once, but a loop body that
-  // declares a local on every iteration (e.g. `char temp = s[i];` inside a
-  // `for` loop) re-executes the very same `decl` AST node many times against
-  // that same frame, and used to be flagged as an illegal redeclaration on
-  // the 2nd+ iteration even though it is perfectly valid, block-scoped C.
-  // To fix this without a full scope-chain rewrite, each declared variable
-  // now remembers *which AST decl node* declared it (`_declNode`). When the
-  // same node re-declares the same name (i.e. we're just re-entering the
-  // same loop iteration's scope), we allow it — the variable is simply reset.
-  // Only a genuinely different declaration statement re-using the same name
-  // is treated as a real redeclaration error.
   _checkRedeclaration(name, frame, line, declNode) {
     if (frame && frame.vars && frame.vars[name] !== undefined) {
       if (declNode && frame.vars[name]._declNode === declNode) {
@@ -3140,7 +3114,18 @@ function renderHeap(heap) {
   heapBlocks.innerHTML = '';
   for (const [addr, block] of Object.entries(heap)) {
     const d = document.createElement('div'); d.className = 'heap-block';
-    const hasStructData = block.data && Object.keys(block.data).length > 0;
+    // FIX: previously this checked `Object.keys(block.data).length > 0`, which
+    // misclassified plain char/int buffers as "struct" blocks the moment
+    // strcpy() wrote into them — because _writeCString() also stashes a
+    // convenience `data.text` string for display purposes. That caused
+    // malloc'd char buffers (e.g. `malloc(30*sizeof(char))` + `strcpy(...)`)
+    // to render as a one-row "text" field table instead of the per-character
+    // array cells (which show '?' for uninitialized bytes and flip to the
+    // real character once written). Struct heap nodes (linked list / tree /
+    // stack, written via `->`) always have real field keys like 'data',
+    // 'next', 'left', 'right' — so excluding the 'text' key is enough to
+    // correctly separate the two cases.
+    const hasStructData = block.data && Object.keys(block.data).some(k => k !== 'text');
     const head = document.createElement('div');
     head.className = 'hb-head';
     head.innerHTML = `<i class="fa-solid fa-microchip" style="color:var(--vsc-orange);font-size:11px"></i><span class="h-addr">${addr}</span><span class="h-sz">${block.size} bytes</span>${segBadge('heap')}<span class="h-sz">${hasStructData ? 'struct' : (block.isChar ? 'char buffer' : 'int buffer')}</span>`;
@@ -3173,6 +3158,10 @@ function renderHeap(heap) {
       body.appendChild(tbl);
       d.appendChild(body);
     } else if (block.arr && block.arr.length) {
+      // Plain char/int buffer (malloc/calloc/realloc). Renders every byte as
+      // a cell: '?' until that byte has actually been written (strcpy,
+      // indexing, etc.), then the real char/int value — exactly the
+      // "? → value" behavior requested.
       const body = document.createElement('div');
       body.className = 'hb-body';
       body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar, block.init);
