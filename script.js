@@ -856,7 +856,7 @@ queue_linked_list:`#include <stdio.h>
 #include <stdlib.h>
 
 struct Node { int data; struct Node *next; };
-struct Node *front = NULL, *rear = NULL;
+struct Node *front = NULL; *rear = NULL;
 
 void enqueue(int val) {
     struct Node *n = (struct Node*)malloc(sizeof(struct Node));
