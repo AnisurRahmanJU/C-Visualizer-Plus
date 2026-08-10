@@ -2915,7 +2915,8 @@ function resetViz() {
   stdinQ = [];
   clearOutput();
   framesEl.innerHTML = '<div class="empty"><i class="fa-solid fa-box-open"></i><p>No stack frames yet. Run the visualizer to see variables.</p></div>';
-  heapSec.style.display = 'none'; heapBlocks.innerHTML = '';
+  heapSec.style.display = '';
+  heapBlocks.innerHTML = '<div class="empty"><i class="fa-solid fa-database"></i><p>No heap allocations yet. malloc/calloc will appear here.</p></div>';
   if (heapDragLayer) heapDragLayer.innerHTML = '';
   heapPositions = {};
   csEl.innerHTML = '<div class="empty"><i class="fa-solid fa-layer-group"></i><p>No active function calls.</p></div>';
@@ -3141,7 +3142,8 @@ function renderFrames(frames, chg) {
 
 function renderHeap(heap) {
   if (!heap || !Object.keys(heap).length) {
-    heapSec.style.display = 'none';
+    heapSec.style.display = '';
+    heapBlocks.innerHTML = '<div class="empty"><i class="fa-solid fa-database"></i><p>No heap allocations yet. malloc/calloc will appear here.</p></div>';
     if (heapDragLayer) heapDragLayer.innerHTML = '';
     return;
   }
