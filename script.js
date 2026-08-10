@@ -1580,7 +1580,7 @@ class CInterpreter {
     this.stdinQueue = stdinQ || [];
     this._stdinIdx = 0;
     this._addrCtr = 0x7fff0000;
-    this._heapCtr = 0x2000;
+    this._heapCtr = 0x7FFE0000;
     this._heap = {};
     this.functions = {};
     this.structs = {};
@@ -1598,7 +1598,7 @@ class CInterpreter {
   }
 
   _nextAddr() { this._addrCtr -= 4; return '0x'+this._addrCtr.toString(16).toUpperCase(); }
-  _heapAddr() { const a='0x'+this._heapCtr.toString(16).toUpperCase(); this._heapCtr+=16; return a; }
+  _heapAddr() { const a='0x'+this._heapCtr.toString(16).toUpperCase().padStart(8,'0'); this._heapCtr+=16; return a; }
 
   _tokenize() {
     const src = this.code; this.tokens = []; let i=0, line=1;
