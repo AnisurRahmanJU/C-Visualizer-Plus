@@ -2774,7 +2774,7 @@ function applyTheme(t){
   root.setAttribute('data-theme', t);
   themeIcon.className = t === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
   cmEditor.setOption('theme', t === 'dark' ? 'one-dark' : 'default');
-  setTimeout(()=>cmEditor.refresh(), 50);
+  setTimeout(()=>{ cmEditor.refresh(); drawArrows(); }, 50);
 }
 document.getElementById('theme-toggle').addEventListener('click', () => {
   applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
@@ -2819,6 +2819,15 @@ const csEl      = $('cs-pane');
 const mmEl      = $('mm-pane');
 const walkEl    = $('walkthrough');
 const sbDot = $('sb-dot'), sbTxt = $('sb-txt'), sbLine = $('sb-line'), sbStep = $('sb-step'), sbFrames = $('sb-frames');
+const memColsEl = $('mem-cols');
+const arrowSvg  = $('arrow-svg');
+const arrowToggle = $('arrow-toggle');
+const heapDragLayer = $('heap-drag-layer');
+
+// Remembers a manually-dragged (or auto-cascaded) position for each live heap
+// address, keyed by address string, e.g. {"0x2000": {x:120,y:40}}. Cleared
+// whenever a fresh run starts so a new program gets a clean auto-layout.
+let heapPositions = {};
 
 sampleSel.addEventListener('change', () => {
   const k = sampleSel.value;
@@ -2849,6 +2858,7 @@ document.addEventListener('mousemove', e => {
   pct = Math.max(20, Math.min(80, pct));
   editorPanel.style.width = pct + '%';
   cmEditor.refresh();
+  drawArrows();
 });
 document.addEventListener('mouseup', () => {
   if (isResizing) {
@@ -2857,6 +2867,7 @@ document.addEventListener('mouseup', () => {
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
     cmEditor.refresh();
+    drawArrows();
   }
 });
 
@@ -2871,6 +2882,9 @@ function sendStdin() {
 
 runBtn.addEventListener('click', runVisualize);
 resetBtn.addEventListener('click', resetViz);
+if (arrowToggle) arrowToggle.addEventListener('change', drawArrows);
+window.addEventListener('resize', () => { if (interp) drawArrows(); });
+document.getElementById('card-memory-body') && document.getElementById('card-memory-body').addEventListener('scroll', () => { if (interp) drawArrows(); }, true);
 
 function runVisualize() {
   stopPlay();
@@ -2878,6 +2892,7 @@ function runVisualize() {
   if (!code) { showWalk('err', '<i class="fa-solid fa-triangle-exclamation"></i> Please enter a C program.'); return; }
   setStatus('running', 'Interpreting…');
   clearOutput();
+  heapPositions = {};
   try {
     interp = new CInterpreter(code, stdinQ.slice());
     if (interp.errors.length) {
@@ -2901,11 +2916,14 @@ function resetViz() {
   clearOutput();
   framesEl.innerHTML = '<div class="empty"><i class="fa-solid fa-box-open"></i><p>No stack frames yet. Run the visualizer to see variables.</p></div>';
   heapSec.style.display = 'none'; heapBlocks.innerHTML = '';
+  if (heapDragLayer) heapDragLayer.innerHTML = '';
+  heapPositions = {};
   csEl.innerHTML = '<div class="empty"><i class="fa-solid fa-layer-group"></i><p>No active function calls.</p></div>';
   mmEl.innerHTML = '<div class="empty"><i class="fa-solid fa-map"></i><p>No memory allocated yet.</p></div>';
   showWalk('', '<b>Welcome to C Visualizer Plus.</b><br>Write any C code in the editor — or pick an example — then click <b>Visualize</b> button to step-by-step execution.');
   clearLineHL(); updateCtrl(); setStatus('', 'Ready');
   sbLine.textContent = '—'; sbStep.textContent = '—'; sbFrames.textContent = '0';
+  if (arrowSvg) arrowSvg.innerHTML = '';
 }
 
 function clearOutput() {
@@ -2971,6 +2989,7 @@ function renderStep(idx) {
   renderHeap(step.heap);
   renderCS(step.cs);
   renderMM(step.frames, step.heap);
+  drawArrows();
 }
 
 function highlightLine(ln) {
@@ -3058,6 +3077,7 @@ function renderFrames(frames, chg) {
         const tr = document.createElement('tr');
         const isChanged = chg === name && isActive;
         if (isChanged) tr.classList.add('v-changed');
+        if (v.addr) tr.dataset.cellAddr = v.addr;
 
         const val = v.value;
         const isPtr = v.type && v.type.includes('*') && !Array.isArray(val);
@@ -3077,7 +3097,9 @@ function renderFrames(frames, chg) {
         } else if (val && typeof val === 'object' && !Array.isArray(val)) {
           vhtml = `<span style="color:var(--text2);font-size:11.5px">{${Object.entries(val).map(([k2,v2])=>`${k2}: ${v2}`).join(', ')}}</span>`;
         } else if (isPtr) {
-          vhtml = `<span class="vv vptr"><i class="fa-solid fa-link" style="font-size:10px"></i> ${val || 'NULL'}</span>`;
+          const isRealAddr = typeof val === 'string' && /^0x[0-9A-Fa-f]+$/.test(val);
+          const srcAttrs = isRealAddr ? ` data-ptr-source="1" data-target-addr="${val}"` : '';
+          vhtml = `<span class="vv vptr${isRealAddr ? ' ptr-src' : ''}"${srcAttrs}><i class="fa-solid fa-link" style="font-size:10px"></i> ${val || 'NULL'}${isRealAddr ? '<span class="arrow-anchor"></span>' : ''}</span>`;
         } else if (v.type === 'va_list') {
           vhtml = `<span class="vv" style="color:var(--tok-type);font-size:11px">${val}</span>`;
           binHtml = '<span class="vbin" style="font-size:10px">variadic</span>';
@@ -3118,11 +3140,23 @@ function renderFrames(frames, chg) {
 }
 
 function renderHeap(heap) {
-  if (!heap || !Object.keys(heap).length) { heapSec.style.display = 'none'; return; }
+  if (!heap || !Object.keys(heap).length) {
+    heapSec.style.display = 'none';
+    if (heapDragLayer) heapDragLayer.innerHTML = '';
+    return;
+  }
   heapSec.style.display = '';
   heapBlocks.innerHTML = '';
-  for (const [addr, block] of Object.entries(heap)) {
+  if (heapDragLayer) heapDragLayer.innerHTML = '';
+
+  // Drop remembered positions for addresses that are no longer live.
+  Object.keys(heapPositions).forEach(a => { if (!heap[a]) delete heapPositions[a]; });
+
+  const addrList = Object.keys(heap);
+  addrList.forEach((addr, idx) => {
+    const block = heap[addr];
     const d = document.createElement('div'); d.className = 'heap-block';
+    d.dataset.cellAddr = addr;
     // FIX: previously this checked `Object.keys(block.data).length > 0`, which
     // misclassified plain char/int buffers as "struct" blocks the moment
     // strcpy() wrote into them — because _writeCString() also stashes a
@@ -3137,7 +3171,7 @@ function renderHeap(heap) {
     const hasStructData = block.data && Object.keys(block.data).some(k => k !== 'text');
     const head = document.createElement('div');
     head.className = 'hb-head';
-    head.innerHTML = `<i class="fa-solid fa-microchip" style="color:var(--vsc-orange);font-size:11px"></i><span class="h-addr">${addr}</span><span class="h-sz">${block.size} bytes</span>${segBadge('heap')}<span class="h-sz">${hasStructData ? 'struct' : (block.isChar ? 'char buffer' : 'int buffer')}</span>`;
+    head.innerHTML = `<i class="fa-solid fa-microchip" style="color:var(--vsc-orange);font-size:11px"></i><span class="h-addr">${addr}</span><span class="h-sz">${block.size} bytes</span>${segBadge('heap')}<span class="h-sz">${hasStructData ? 'struct' : (block.isChar ? 'char buffer' : 'int buffer')}</span><i class="fa-solid fa-up-down-left-right hb-grip" title="Drag to move"></i>`;
     d.appendChild(head);
 
     if (hasStructData) {
@@ -3150,13 +3184,14 @@ function renderHeap(heap) {
       tbl.innerHTML = `<thead><tr><th>Field</th><th>Value</th></tr></thead>`;
       const tb = document.createElement('tbody');
       for (const [fname, fval] of Object.entries(block.data)) {
+        if (fname === 'text') continue;
         const tr = document.createElement('tr');
-        const isPtrVal = typeof fval === 'string' && fval.startsWith('0x');
+        const isPtrVal = typeof fval === 'string' && /^0x[0-9A-Fa-f]+$/.test(fval);
         let vhtml;
         if (fval === null) {
           vhtml = `<span class="vv vptr">NULL</span>`;
         } else if (isPtrVal) {
-          vhtml = `<span class="vv vptr"><i class="fa-solid fa-link" style="font-size:10px"></i> ${fval}</span>`;
+          vhtml = `<span class="vv vptr ptr-src" data-ptr-source="1" data-target-addr="${fval}"><i class="fa-solid fa-link" style="font-size:10px"></i> ${fval}<span class="arrow-anchor"></span></span>`;
         } else {
           vhtml = `<span class="vv">${String(fval).replace(/</g,'&lt;')}</span>`;
         }
@@ -3177,8 +3212,68 @@ function renderHeap(heap) {
       d.appendChild(body);
     }
 
-    heapBlocks.appendChild(d);
-  }
+    if (heapDragLayer) {
+      // Place the block: reuse its remembered spot if the user (or a prior
+      // render) already positioned it, otherwise auto-cascade new blocks
+      // just under the "Heap Memory" label so they start out visible and
+      // non-overlapping.
+      let pos = heapPositions[addr];
+      if (!pos) {
+        const anchorRect = heapSec.getBoundingClientRect();
+        const containerRect = memColsEl.getBoundingClientRect();
+        const baseX = Math.max(0, anchorRect.left - containerRect.left) + (idx % 3) * 16;
+        const baseY = Math.max(0, anchorRect.top - containerRect.top) + 30 + idx * 92;
+        pos = { x: baseX, y: baseY };
+        heapPositions[addr] = pos;
+      }
+      d.style.left = pos.x + 'px';
+      d.style.top = pos.y + 'px';
+      makeHeapBlockDraggable(d, addr);
+      heapDragLayer.appendChild(d);
+    } else {
+      heapBlocks.appendChild(d);
+    }
+  });
+}
+
+// Lets a heap block be picked up by its header and dropped anywhere inside
+// the Variables card (over the stack frames too, not just the heap column).
+// Uses Pointer Events so the same code path handles mouse, touch, and pen.
+function makeHeapBlockDraggable(el, addr) {
+  const handle = el.querySelector('.hb-head');
+  if (!handle) return;
+  let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
+
+  handle.addEventListener('pointerdown', e => {
+    if (e.button !== undefined && e.button !== 0) return; // left-click / primary touch only
+    dragging = true;
+    el.classList.add('dragging');
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    startX = e.clientX; startY = e.clientY;
+    origX = parseFloat(el.style.left) || 0;
+    origY = parseFloat(el.style.top) || 0;
+    e.preventDefault();
+  });
+
+  handle.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const nx = Math.max(0, origX + (e.clientX - startX));
+    const ny = Math.max(0, origY + (e.clientY - startY));
+    el.style.left = nx + 'px';
+    el.style.top = ny + 'px';
+    heapPositions[addr] = { x: nx, y: ny };
+    drawArrows();
+  });
+
+  const endDrag = e => {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+    drawArrows();
+  };
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
 }
 
 function renderCS(stack) {
@@ -3219,6 +3314,81 @@ function renderMM(frames, heap) {
     grid.appendChild(cell);
   });
   mmEl.innerHTML = ''; mmEl.appendChild(grid);
+}
+
+// ─── Pointer-arrow overlay (Python-Tutor style) ──────────────────────────────
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function drawArrows() {
+  if (!arrowSvg || !memColsEl) return;
+  arrowSvg.innerHTML = '';
+  if (arrowToggle && !arrowToggle.checked) { arrowSvg.setAttribute('width', 0); arrowSvg.setAttribute('height', 0); return; }
+
+  // Give layout a moment to settle, then measure. Since arrowSvg is an
+  // absolutely-positioned child of #mem-cols (the scrolling content itself,
+  // not the scroll viewport), relative offsets stay correct even when the
+  // outer .viz-card-body is scrolled — no extra scroll-compensation needed.
+  const w = memColsEl.scrollWidth || memColsEl.offsetWidth || 1;
+  const h = memColsEl.scrollHeight || memColsEl.offsetHeight || 1;
+  arrowSvg.setAttribute('width', w);
+  arrowSvg.setAttribute('height', h);
+  arrowSvg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  defs.innerHTML = `<marker id="ptr-arrowhead" markerWidth="7" markerHeight="7" refX="5.5" refY="2.5" orient="auto"><path d="M0,0 L0,5 L5.5,2.5 z" style="fill:var(--ptr-color,#af00db)"></path></marker>`;
+  arrowSvg.appendChild(defs);
+
+  const containerRect = memColsEl.getBoundingClientRect();
+
+  // Build address → target element map (first match wins).
+  const targets = {};
+  memColsEl.querySelectorAll('[data-cell-addr]').forEach(el => {
+    const a = el.dataset.cellAddr;
+    if (a && targets[a] === undefined) targets[a] = el;
+  });
+
+  const sources = memColsEl.querySelectorAll('[data-ptr-source="1"]');
+  let drawn = 0;
+  sources.forEach(src => {
+    const addr = src.dataset.targetAddr;
+    const tgtEl = targets[addr];
+    if (!tgtEl) return;
+    // don't draw a self-loop if a pointer's own row happens to match its target
+    const srcRow = src.closest('tr') || src.closest('.heap-block') || src;
+    if (srcRow === tgtEl) return;
+
+    const anchor = src.querySelector('.arrow-anchor') || src;
+    const ar = anchor.getBoundingClientRect();
+    const tr = tgtEl.getBoundingClientRect();
+
+    let x1 = ar.left + ar.width / 2 - containerRect.left;
+    let y1 = ar.top + ar.height / 2 - containerRect.top;
+    let x2, y2;
+
+    if (tr.left >= ar.right - 4) {
+      x2 = tr.left - containerRect.left;
+      y2 = tr.top + tr.height / 2 - containerRect.top;
+    } else if (tr.right <= ar.left + 4) {
+      x2 = tr.right - containerRect.left;
+      y2 = tr.top + tr.height / 2 - containerRect.top;
+    } else {
+      x2 = tr.left + tr.width / 2 - containerRect.left;
+      y2 = tr.top - containerRect.top;
+    }
+
+    const dx = Math.max(36, Math.abs(x2 - x1) * 0.5);
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
+    path.setAttribute('class', 'ptr-arrow-path');
+    path.setAttribute('marker-end', 'url(#ptr-arrowhead)');
+    arrowSvg.appendChild(path);
+
+    const dot = document.createElementNS(SVG_NS, 'circle');
+    dot.setAttribute('cx', x1); dot.setAttribute('cy', y1); dot.setAttribute('r', 3);
+    dot.setAttribute('class', 'ptr-arrow-dot');
+    arrowSvg.appendChild(dot);
+    drawn++;
+  });
 }
 
 
