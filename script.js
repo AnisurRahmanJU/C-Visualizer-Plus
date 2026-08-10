@@ -1495,7 +1495,6 @@ int main() {
     printf("Direct call via fp: %d\\n", fp(7, 8));
     return 0;
 }`,
-
 custom_boolean:`#include <stdio.h>
 #include <string.h>
 
@@ -1530,6 +1529,52 @@ int main() {
     int correct = 1;
     show(correct);
 
+    return 0;
+}`,
+    
+malloc_2d:`#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+    int rows = 2;
+    int cols = 2;
+    int i, j;
+
+    int **arr = (int**)malloc(rows * sizeof(int*));
+    if (arr == NULL) {
+        return 1;
+    }
+
+    for (i = 0; i < rows; i++) {
+        arr[i] = (int*)malloc(cols * sizeof(int));
+        if (arr[i] == NULL) {
+            return 1;
+        }
+    }
+
+    int count = 1;
+    for (i = 0; i < rows; i++) {
+        for (j = 0; j < cols; j++) {
+            arr[i][j] = count * 10;
+            count++;
+        }
+    }
+
+    for (i = 0; i < rows; i++) {
+        for (j = 0; j < cols; j++) {
+            printf("arr[%d][%d] = %d\n", i, j, arr[i][j]);
+        }
+    }
+
+    for (i = 0; i < rows; i++) {
+        free(arr[i]);
+        arr[i] = NULL;
+    }
+
+    free(arr);
+    arr = NULL;
+
+    printf("Memory freed.\n");
     return 0;
 }`,
 };
@@ -3214,27 +3259,39 @@ function renderHeap(heap) {
     d.appendChild(head);
 
     if (hasStructData) {
-      // Struct-backed heap block (linked list / tree / stack node, etc.)
-      // Fields are written via the `->` (pmem) path into block.data, not block.arr.
+      // Struct-backed heap block (linked list / tree / stack node, etc.) OR
+      // a malloc'd int/char array accessed via arr[i] = val (each index is
+      // its own object key, so re-writing the same index just updates that
+      // key's value in place — it never grows a duplicate row).
       const body = document.createElement('div');
       body.className = 'hb-body';
       const tbl = document.createElement('table');
       tbl.className = 'vtbl';
-      tbl.innerHTML = `<thead><tr><th>Field</th><th>Value</th></tr></thead>`;
+      tbl.innerHTML = `<thead><tr><th>Field</th><th>Value</th><th>Binary</th><th>Type</th></tr></thead>`;
       const tb = document.createElement('tbody');
       for (const [fname, fval] of Object.entries(block.data)) {
         if (fname === 'text') continue;
         const tr = document.createElement('tr');
         const isPtrVal = typeof fval === 'string' && /^0x[0-9A-Fa-f]+$/.test(fval);
-        let vhtml;
+        const isIndex = /^\d+$/.test(fname); // arr[i]=v write -> numeric-string key
+        const label = isIndex ? `[${fname}]` : fname;
+        let vhtml, binHtml = '<span class="vbin">—</span>', typeLabel;
         if (fval === null) {
           vhtml = `<span class="vv vptr">NULL</span>`;
+          typeLabel = 'pointer';
         } else if (isPtrVal) {
           vhtml = `<span class="vv vptr ptr-src" data-ptr-source="1" data-target-addr="${fval}"><i class="fa-solid fa-link" style="font-size:10px"></i> ${fval}<span class="arrow-anchor"></span></span>`;
+          typeLabel = 'pointer';
+        } else if (typeof fval === 'number') {
+          vhtml = `<span class="vv">${String(fval).replace(/</g,'&lt;')}</span>`;
+          const elemType = isIndex ? (block.isChar ? 'char' : 'int') : 'int';
+          binHtml = `<span class="vbin" title="${elemType === 'char' ? '8' : '32'}-bit">${toBinaryHtml(fval, elemType)}</span>`;
+          typeLabel = elemType;
         } else {
           vhtml = `<span class="vv">${String(fval).replace(/</g,'&lt;')}</span>`;
+          typeLabel = 'char';
         }
-        tr.innerHTML = `<td><span class="vn">${fname}</span></td><td>${vhtml}</td>`;
+        tr.innerHTML = `<td><span class="vn">${label}</span></td><td>${vhtml}</td><td>${binHtml}</td><td><span class="vt">${typeLabel}</span></td>`;
         tb.appendChild(tr);
       }
       tbl.appendChild(tb);
