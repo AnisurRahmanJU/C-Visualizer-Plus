@@ -34,10 +34,9 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
     font-size: 14px;
     color: var(--text-bright);
     white-space: nowrap;
-    flex-shrink: 0; /* Keeps logo pinned to the left */
+    flex-shrink: 0; 
 }
 
-/* Ensure the spacer doesn't shrink the buttons */
 .tb-spacer {
     flex: 1;
     min-width: 20px; /* Ensures space between items */
