@@ -1496,7 +1496,7 @@ int main() {
     return 0;
 }`,
 
-boolean:`#include <stdio.h>
+custom_boolean:`#include <stdio.h>
 #include <string.h>
 
 void show(int value) {
