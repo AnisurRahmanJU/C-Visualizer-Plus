@@ -169,9 +169,9 @@
               <div class="sec-hdr"><i class="fa-solid fa-layer-group"></i> Stack Memory</div>
               <div id="frames-pane"></div>
             </div>
-            <div id="heap-section" style="display:none">
+            <div id="heap-section">
               <div class="sec-hdr"><i class="fa-solid fa-database"></i> Heap Memory <span class="hb-drag-hint"><i class="fa-solid fa-arrows-up-down-left-right"></i> drag blocks to rearrange</span></div>
-              <div id="heap-blocks"></div>
+              <div id="heap-blocks"><div class="empty"><i class="fa-solid fa-database"></i><p>No heap allocations yet. malloc/calloc will appear here.</p></div></div>
             </div>
             <svg id="arrow-svg" class="arrow-svg"></svg>
             <div id="heap-drag-layer"></div>
