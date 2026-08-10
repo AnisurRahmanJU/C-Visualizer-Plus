@@ -1501,32 +1501,32 @@ custom_boolean:`#include <stdio.h>
 
 void show(int value) {
     if (value) {
-        printf("true\n");
+        printf("true\\n");
     } else {
-        printf("false\n");
+        printf("false\\n");
     }
 }
 
 int main() {
-    printf("--- Condition Operations ---\\n");
+    printf("Condition Operations:\\n");
     show(5 > 3);
     show(10 == 15);
     show(strcmp("Anisur", "Anisur") == 0);
     show(strcmp("Bangla", "Code") != 0);
 
-    printf("--- Logical Operations ---\\n");
+    printf("Logical Operations:\\n");
     show((10 > 5) && (20 < 30));
     show((5 > 10) || (20 < 30));
     show(!(5 > 10));
 
-    printf("--- String Checks ---\\n");
+    printf("String Checks:\\n");
     show(strlen("Likhan") > 0);
 
-    printf("--- Number Checks ---\\n");
+    printf("Number Checks:\\n");
     show(7 % 2 == 0);
     show(8 % 2 == 0);
 
-    printf("--- Variable Check ---\\n");
+    printf("Variable Check:\\n");
     int correct = 1;
     show(correct);
 
