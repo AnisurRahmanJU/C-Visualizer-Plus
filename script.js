@@ -1544,14 +1544,12 @@ int main() {
     if (arr == NULL) {
         return 1;
     }
-
     for (i = 0; i < rows; i++) {
         arr[i] = (int*)malloc(cols * sizeof(int));
         if (arr[i] == NULL) {
             return 1;
         }
     }
-
     int count = 1;
     for (i = 0; i < rows; i++) {
         for (j = 0; j < cols; j++) {
@@ -1559,22 +1557,19 @@ int main() {
             count++;
         }
     }
-
     for (i = 0; i < rows; i++) {
         for (j = 0; j < cols; j++) {
-            printf("arr[%d][%d] = %d\n", i, j, arr[i][j]);
+            printf("arr[%d][%d] = %d\\n", i, j, arr[i][j]);
         }
     }
-
     for (i = 0; i < rows; i++) {
         free(arr[i]);
         arr[i] = NULL;
     }
-
     free(arr);
     arr = NULL;
 
-    printf("Memory freed.\n");
+    printf("Memory freed.\\n");
     return 0;
 }`,
 };
