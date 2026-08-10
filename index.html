@@ -156,12 +156,25 @@
     <div id="viz-grid">
       <!-- card-memory: id="frames-pane" for frames, id="heap-section"/"heap-blocks" for heap -->
       <div class="viz-card" id="card-memory">
-        <div class="viz-card-hdr"><i class="fa-solid fa-microchip"></i> Variables</div>
-        <div class="viz-card-body">
-          <div id="frames-pane"></div>
-          <div id="heap-section" style="display:none">
-            <div class="sec-hdr"><i class="fa-solid fa-database"></i> Heap Memory</div>
-            <div id="heap-blocks"></div>
+        <div class="viz-card-hdr">
+          <i class="fa-solid fa-microchip"></i> Variables
+          <label class="arrow-toggle-wrap" title="Toggle pointer arrows">
+            <input type="checkbox" id="arrow-toggle" checked>
+            <span><i class="fa-solid fa-arrow-right-long"></i> Arrows</span>
+          </label>
+        </div>
+        <div class="viz-card-body" id="card-memory-body">
+          <div id="mem-cols">
+            <div id="frames-col">
+              <div class="sec-hdr"><i class="fa-solid fa-layer-group"></i> Stack Memory</div>
+              <div id="frames-pane"></div>
+            </div>
+            <div id="heap-section" style="display:none">
+              <div class="sec-hdr"><i class="fa-solid fa-database"></i> Heap Memory <span class="hb-drag-hint"><i class="fa-solid fa-arrows-up-down-left-right"></i> drag blocks to rearrange</span></div>
+              <div id="heap-blocks"></div>
+            </div>
+            <svg id="arrow-svg" class="arrow-svg"></svg>
+            <div id="heap-drag-layer"></div>
           </div>
         </div>
       </div>
