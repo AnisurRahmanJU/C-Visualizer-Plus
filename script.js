@@ -383,9 +383,9 @@ int main() {
     struct Student student2;
     struct Student student3;
     
-    char *name_pointer[6] = "Zahid";
-    char * show= &name_pointer;
-    student2.name = *show;
+    char *show_name[6] = "Zahid";
+    char *name_pointer= &show_name;
+    student2.name = *name_pointer;
     student2.age = 25;
     student2.gpa = 4.30;
    
