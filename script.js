@@ -379,12 +379,20 @@ struct Student {
 };
 
 int main() {
-    struct Student student1 = {"Alice Smith", 20, 3.85};
+    struct Student student1 = {"Anisur", 25, 4.56};
     struct Student student2;
+    struct Student student3;
     
-    strcpy(student2.name, "Bob Jones"); 
-    student2.age = 22;
-    student2.gpa = 3.62;
+    char *show_name[6] = "Zahid";
+    char *name_pointer= &show_name;
+    student2.name = *name_pointer;
+    student2.age = 25;
+    student2.gpa = 4.30;
+   
+    strcpy(student3.name, "Abdullah");
+    student3.age = 25;
+    student3.gpa = 4.94;
+ 
 
     printf("Student 1 Details:\\n");
     printf("Name: %s\\n", student1.name);
@@ -394,10 +402,16 @@ int main() {
     printf("Student 2 Details:\\n");
     printf("Name: %s\\n", student2.name);
     printf("Age: %d\\n", student2.age);
-    printf("GPA: %.2f\\n", student2.gpa);
+    printf("GPA: %.2f\\n\\n", student2.gpa);
+    
+    printf("Student 3 Details:\\n");
+    printf("Name: %s\\n", student3.name);
+    printf("Age: %d\\n", student3.age);
+    printf("GPA: %.2f\\n\\n", student3.gpa);
 
     return 0;
 }`,
+    
 malloc:`#include <stdio.h>
 #include <stdlib.h>
 
