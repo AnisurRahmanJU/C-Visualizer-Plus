@@ -370,21 +370,32 @@ int main() {
     return 0;
 }`,
 struct:`#include <stdio.h>
+#include <string.h>
 
-struct Point {
-    int x;
-    int y;
+struct Student {
+    char name[50];
+    int age;
+    float gpa;
 };
 
 int main() {
-    struct Point a;
-    a.x = 3;
-    a.y = 4;
-    struct Point b;
-    b.x = 6;
-    b.y = 8;
-    printf("a = (%d, %d)\\n", a.x, a.y);
-    printf("b = (%d, %d)\\n", b.x, b.y);
+    struct Student student1 = {"Alice Smith", 20, 3.85};
+    struct Student student2;
+    
+    strcpy(student2.name, "Bob Jones"); 
+    student2.age = 22;
+    student2.gpa = 3.62;
+
+    printf("Student 1 Details:\\n");
+    printf("Name: %s\\n", student1.name);
+    printf("Age: %d\\n", student1.age);
+    printf("GPA: %.2f\\n\\n", student1.gpa);
+
+    printf("Student 2 Details:\\n");
+    printf("Name: %s\\n", student2.name);
+    printf("Age: %d\\n", student2.age);
+    printf("GPA: %.2f\\n", student2.gpa);
+
     return 0;
 }`,
 malloc:`#include <stdio.h>
