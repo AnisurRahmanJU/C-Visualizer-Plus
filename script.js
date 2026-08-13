@@ -397,17 +397,17 @@ int main() {
     printf("Student 1 Details:\\n");
     printf("Name: %s\\n", student1.name);
     printf("Age: %d\\n", student1.age);
-    printf("GPA: %.2f\\n\n", student1.gpa);
+    printf("GPA: %.2f\\n\\n", student1.gpa);
 
     printf("Student 2 Details:\\n");
     printf("Name: %s\\n", student2.name);
     printf("Age: %d\\n", student2.age);
-    printf("GPA: %.2f\\n\n", student2.gpa);
+    printf("GPA: %.2f\\n\\n", student2.gpa);
     
     printf("Student 3 Details:\\n");
     printf("Name: %s\\n", student3.name);
     printf("Age: %d\\n", student3.age);
-    printf("GPA: %.2f\\n\n", student3.gpa);
+    printf("GPA: %.2f\\n\\n", student3.gpa);
 
     return 0;
 }`,
