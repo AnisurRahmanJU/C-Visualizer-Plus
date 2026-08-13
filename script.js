@@ -331,7 +331,7 @@ int main() {
     return 0;
 }`,
     
-matrix_2d":`#include <stdio.h>
+matrix_2d:`#include <stdio.h>
 
 int main() {
     int matrix[2][2];
