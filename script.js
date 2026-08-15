@@ -1675,6 +1675,7 @@ int main() {
 callby_vr:`#include <stdio.h>
 
 int main() {
+
     // Call by Value
     int num1 = 10;
     int num2 = num1;
