@@ -2372,17 +2372,6 @@ class CInterpreter {
         else val=new Array(sz).fill(0);
       } else {
         if (d.init && d.init.type === 'arrlit') {
-          // Brace-init `{...}` on a non-array variable. Two very different
-          // cases share this syntax:
-          //  - `struct Point p = {3, 4};`  -> a STRUCT literal. Structs are
-          //    heterogeneous by design (each field has its own type), so
-          //    this must NEVER go through the array homogeneity check.
-          //  - a genuinely unknown/mistyped struct type (e.g. `struct Stu`
-          //    when only `struct Student` was ever defined) — this must
-          //    raise a clear "unknown struct type" error rather than
-          //    silently falling through to array-literal parsing, which
-          //    would misfire the (correct, array-only) homogeneity check
-          //    against heterogeneous struct field values.
           const structName = vt.replace(/^struct\s+/, '').trim();
           const fields = this.structs[structName] || this.structs[vt];
           if (fields) {
@@ -2399,25 +2388,6 @@ class CInterpreter {
             val = this._flattenInit(d.init, frame);
           }
         } else if (!d.init) {
-          // FIX (main bug being fixed here): a plain `struct Student student2;`
-          // declaration with NO initializer used to fall to `val = 0`. That
-          // meant `student2` was stored as a bare number instead of an
-          // object with `name`/`age`/`gpa` fields. Any later use of
-          // `student2.field` — including as the destination buffer for
-          // `strcpy(student2.name, "Bob Jones")` — silently no-op'd:
-          //   - `_eval`'s 'mem' case does `obj[e.f] ?? 0`, and on a number
-          //     `obj` that's always 0.
-          //   - `strcpy`'s target resolution (`_resolveBuffer`) requires
-          //     either a real array or a heap block; a plain number
-          //     resolves to neither, so the write was dropped entirely.
-          // Fix: when declaring a variable of a known `struct` type with no
-          // initializer, build a real object with each field pre-populated
-          // (0 for scalar fields, a correctly-sized zero-filled array for
-          // array fields such as `char name[50]`) — mirroring how struct
-          // literals are built just above. This makes plain member
-          // assignment (`student2.age = 22;`), `strcpy`/`strcat` into
-          // char-array fields, and printf reads all work identically
-          // whether or not the struct was initialized inline.
           const structName = vt.replace(/^struct\s+/, '').trim();
           const fields = this.structs[structName] || this.structs[vt];
           if (fields) {
@@ -2895,41 +2865,100 @@ class CInterpreter {
     return out.length;
   }
 
+  // Writes a scalar value to the memory cell identified by `addr` — used by
+  // scanf() to store into whatever &var / &arr[i] / &struct.field resolved
+  // to. Mirrors the same two lookup paths used everywhere else in the
+  // interpreter (an addr-cell created by &-of a non-plain-id expression, or
+  // a plain stack/global variable whose .addr matches).
+  _writeScalar(addr, value) {
+    if (this._addrCells && this._addrCells[addr]) {
+      this._addrCells[addr].set(value);
+      return true;
+    }
+    for (const f of [...this._callStack, this._globalFrame]) {
+      if (!f) continue;
+      for (const [k, v] of Object.entries(f.vars)) {
+        if (v.addr === addr) { v.value = value; v.changed = true; return true; }
+      }
+    }
+    return false;
+  }
+
   _scanf(args,callSite,frame){
     const fmt=args[0]||'';
-    const specs=(fmt.match(/%[diouxXeEfgGcsp]/g)||[]);
+    // Match every real conversion spec: %[flags][width][.precision][length]conv
+    // Length modifiers (l, ll, h, hh, L, j, z, t) and any width/precision are
+    // now captured and consumed correctly, so formats like %lf, %.2f, %.6lf,
+    // %ld, %hu, %u, %x, %c, %s, %p etc. are all recognized. The previous
+    // regex only matched a bare %[diouxXeEfgGcsp] directly after the '%',
+    // so ANY spec with a length modifier — including the very common %lf
+    // for a double — produced zero matches, meaning scanf() silently read
+    // nothing and never prompted for input at all.
+    const specRe = /%[-+0 #]*\d*(?:\.\d+)?(hh|h|ll|l|L|j|z|t)?([diouxXeEfFgGaAcsp])/g;
+    const specs = [];
+    let m;
+    while ((m = specRe.exec(fmt)) !== null) {
+      specs.push({ full: m[0], length: m[1] || '', conv: m[2] });
+    }
     let read=0;
     for(let i=0;i<specs.length;i++){
-      const spec=specs[i];
-      const addr=args[i+1];
+      const { conv, full } = specs[i];
+      const target = args[i+1];
       let raw;
       if(this._stdinIdx < this.stdinQueue.length){
         raw = String(this.stdinQueue[this._stdinIdx++]);
       } else {
-        const prompted = window.prompt('scanf input (' + spec + '):', '0');
-        raw = (prompted !== null && prompted.trim() !== '') ? prompted.trim() : '0';
+        const label = conv==='c' ? 'a single character' : conv==='s' ? 'a word (no spaces)' : `a value for ${full}`;
+        const prompted = window.prompt(`Program needs input\n\nscanf("${full}", ...) — enter ${label}:`, '');
+        raw = (prompted !== null) ? prompted : '';
         this.stdinQueue.push(raw);
         this._stdinIdx++;
       }
-      const parsed = (spec==='%f' || spec==='%lf' || spec==='%g')
-        ? (parseFloat(raw) || 0) : (parseInt(raw) || 0);
 
-      let wrote=false;
-      if(this._addrCells && this._addrCells[addr]){
-        this._addrCells[addr].set(parsed);
-        wrote=true;
+      let displayVal, wrote=false;
+      if(conv==='s'){
+        // %s: read one whitespace-delimited token and write it as a
+        // null-terminated C string into the destination buffer (array or
+        // heap block) — reuses the same writer strcpy() uses.
+        const word = raw.trim().split(/\s+/)[0] || '';
+        this._writeCString(target, word);
+        displayVal = `"${word.replace(/</g,'&lt;')}"`;
+        wrote = true;
+      } else if(conv==='c'){
+        // %c: exactly one character, stored as its char code.
+        const ch = raw.length>0 ? raw[0] : '\0';
+        const code = ch.charCodeAt(0) || 0;
+        wrote = this._writeScalar(target, code);
+        displayVal = `'${ch==='\0'?'\\0':ch}'`;
+      } else if(conv==='p'){
+        // %p: store the entered address/text as-is.
+        const val = raw.trim();
+        wrote = this._writeScalar(target, val);
+        displayVal = val || 'NULL';
       } else {
-        for(const f of [...this._callStack, this._globalFrame]){
-          if(!f) continue;
-          for(const [k,v] of Object.entries(f.vars)){
-            if(v.addr === addr){ v.value = parsed; v.changed = true; wrote=true; }
-          }
+        const trimmed = raw.trim();
+        let parsed;
+        if(['f','F','e','E','g','G','a','A'].includes(conv)){
+          // %f/%lf/%.2f/%.6lf/%e/%g/... — all floating point forms (float
+          // or double — JS numbers don't distinguish the width, but the
+          // parsed value is correct either way).
+          parsed = parseFloat(trimmed); if(isNaN(parsed)) parsed = 0;
+        } else if(conv==='x'||conv==='X'){
+          parsed = parseInt(trimmed,16) || 0;
+        } else if(conv==='o'){
+          parsed = parseInt(trimmed,8) || 0;
+        } else if(conv==='u'){
+          parsed = Math.abs(parseInt(trimmed,10) || 0);
+        } else { // d, i  (and their l/ll/h/hh length-modified forms: %ld, %lld, %hd...)
+          parsed = parseInt(trimmed,10) || 0;
         }
+        wrote = this._writeScalar(target, parsed);
+        displayVal = String(parsed);
       }
       if(wrote) read++;
 
       this.output += raw + '\n';
-      this._addStep({ln: callSite?.ln || 1, desc: `<code>scanf</code> read: <b>"${raw}"</b> &rarr; stored as <b>${parsed}</b>`,
+      this._addStep({ln: callSite?.ln || 1, desc: `<code>scanf</code> read <b>"${full}"</b>: typed <b>"${raw.replace(/</g,'&lt;')}"</b> &rarr; stored as <b>${displayVal}</b>`,
         frames: this._snapFrames(), heap: this._snapHeap(), out: this.output, cs: this._callStack.map(f=>f.name)});
     }
     return read;
@@ -3384,15 +3413,6 @@ function renderFrames(frames, chg) {
             vhtml = buildArrCellsHtml(val, v.type, v.type && v.type.includes('char'));
           }
         } else if (val && typeof val === 'object' && !Array.isArray(val)) {
-          // FIX: struct fields that are char arrays (e.g. `char name[50]`)
-          // are stored internally as an array of character codes. Simply
-          // template-stringifying the field value (the old behavior) turned
-          // an array into its default comma-joined string, e.g.
-          // "66,111,98,74,111,110,101,115,0,0,0,...". Route every field
-          // through fieldToDisplay(), which recognizes char-code-like
-          // arrays and renders them as a proper quoted string ("Bob Jones")
-          // instead, while leaving non-char-array fields (numbers, other
-          // arrays) displayed as before.
           vhtml = `<span style="color:var(--text2);font-size:11.5px">{${Object.entries(val).map(([k2,v2])=>`${k2}: ${fieldToDisplay(v2)}`).join(', ')}}</span>`;
         } else if (isPtr) {
           const isRealAddr = typeof val === 'string' && /^0x[0-9A-Fa-f]+$/.test(val);
@@ -3448,7 +3468,6 @@ function renderHeap(heap) {
   heapBlocks.innerHTML = '';
   if (heapDragLayer) heapDragLayer.innerHTML = '';
 
-  // Drop remembered positions for addresses that are no longer live.
   Object.keys(heapPositions).forEach(a => { if (!heap[a]) delete heapPositions[a]; });
 
   const addrList = Object.keys(heap);
@@ -3456,17 +3475,6 @@ function renderHeap(heap) {
     const block = heap[addr];
     const d = document.createElement('div'); d.className = 'heap-block';
     d.dataset.cellAddr = addr;
-    // FIX: previously this checked `Object.keys(block.data).length > 0`, which
-    // misclassified plain char/int buffers as "struct" blocks the moment
-    // strcpy() wrote into them — because _writeCString() also stashes a
-    // convenience `data.text` string for display purposes. That caused
-    // malloc'd char buffers (e.g. `malloc(30*sizeof(char))` + `strcpy(...)`)
-    // to render as a one-row "text" field table instead of the per-character
-    // array cells (which show '?' for uninitialized bytes and flip to the
-    // real character once written). Struct heap nodes (linked list / tree /
-    // stack, written via `->`) always have real field keys like 'data',
-    // 'next', 'left', 'right' — so excluding the 'text' key is enough to
-    // correctly separate the two cases.
     const hasStructData = block.data && Object.keys(block.data).some(k => k !== 'text');
     const head = document.createElement('div');
     head.className = 'hb-head';
@@ -3474,10 +3482,6 @@ function renderHeap(heap) {
     d.appendChild(head);
 
     if (hasStructData) {
-      // Struct-backed heap block (linked list / tree / stack node, etc.) OR
-      // a malloc'd int/char array accessed via arr[i] = val (each index is
-      // its own object key, so re-writing the same index just updates that
-      // key's value in place — it never grows a duplicate row).
       const body = document.createElement('div');
       body.className = 'hb-body';
       const tbl = document.createElement('table');
@@ -3488,7 +3492,7 @@ function renderHeap(heap) {
         if (fname === 'text') continue;
         const tr = document.createElement('tr');
         const isPtrVal = typeof fval === 'string' && /^0x[0-9A-Fa-f]+$/.test(fval);
-        const isIndex = /^\d+$/.test(fname); // arr[i]=v write -> numeric-string key
+        const isIndex = /^\d+$/.test(fname);
         const label = isIndex ? `[${fname}]` : fname;
         let vhtml, binHtml = '<span class="vbin">—</span>', typeLabel;
         if (fval === null) {
@@ -3513,10 +3517,6 @@ function renderHeap(heap) {
       body.appendChild(tbl);
       d.appendChild(body);
     } else if (block.arr && block.arr.length) {
-      // Plain char/int buffer (malloc/calloc/realloc). Renders every byte as
-      // a cell: '?' until that byte has actually been written (strcpy,
-      // indexing, etc.), then the real char/int value — exactly the
-      // "? → value" behavior requested.
       const body = document.createElement('div');
       body.className = 'hb-body';
       body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar, block.init);
@@ -3524,10 +3524,6 @@ function renderHeap(heap) {
     }
 
     if (heapDragLayer) {
-      // Place the block: reuse its remembered spot if the user (or a prior
-      // render) already positioned it, otherwise auto-cascade new blocks
-      // just under the "Heap Memory" label so they start out visible and
-      // non-overlapping.
       let pos = heapPositions[addr];
       if (!pos) {
         const anchorRect = heapSec.getBoundingClientRect();
@@ -3547,16 +3543,13 @@ function renderHeap(heap) {
   });
 }
 
-// Lets a heap block be picked up by its header and dropped anywhere inside
-// the Variables card (over the stack frames too, not just the heap column).
-// Uses Pointer Events so the same code path handles mouse, touch, and pen.
 function makeHeapBlockDraggable(el, addr) {
   const handle = el.querySelector('.hb-head');
   if (!handle) return;
   let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
 
   handle.addEventListener('pointerdown', e => {
-    if (e.button !== undefined && e.button !== 0) return; // left-click / primary touch only
+    if (e.button !== undefined && e.button !== 0) return;
     dragging = true;
     el.classList.add('dragging');
     try { handle.setPointerCapture(e.pointerId); } catch (_) {}
@@ -3635,10 +3628,6 @@ function drawArrows() {
   arrowSvg.innerHTML = '';
   if (arrowToggle && !arrowToggle.checked) { arrowSvg.setAttribute('width', 0); arrowSvg.setAttribute('height', 0); return; }
 
-  // Give layout a moment to settle, then measure. Since arrowSvg is an
-  // absolutely-positioned child of #mem-cols (the scrolling content itself,
-  // not the scroll viewport), relative offsets stay correct even when the
-  // outer .viz-card-body is scrolled — no extra scroll-compensation needed.
   const w = memColsEl.scrollWidth || memColsEl.offsetWidth || 1;
   const h = memColsEl.scrollHeight || memColsEl.offsetHeight || 1;
   arrowSvg.setAttribute('width', w);
@@ -3651,7 +3640,6 @@ function drawArrows() {
 
   const containerRect = memColsEl.getBoundingClientRect();
 
-  // Build address → target element map (first match wins).
   const targets = {};
   memColsEl.querySelectorAll('[data-cell-addr]').forEach(el => {
     const a = el.dataset.cellAddr;
@@ -3664,7 +3652,6 @@ function drawArrows() {
     const addr = src.dataset.targetAddr;
     const tgtEl = targets[addr];
     if (!tgtEl) return;
-    // don't draw a self-loop if a pointer's own row happens to match its target
     const srcRow = src.closest('tr') || src.closest('.heap-block') || src;
     if (srcRow === tgtEl) return;
 
@@ -3699,6 +3686,7 @@ function drawArrows() {
     dot.setAttribute('class', 'ptr-arrow-dot');
     arrowSvg.appendChild(dot);
     drawn++;
+      
   });
 }
 
