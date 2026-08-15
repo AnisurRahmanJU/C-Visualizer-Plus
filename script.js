@@ -1687,10 +1687,10 @@ int main() {
     // Call by Reference
     int num3 = 10;
     int *num4 = &num3;
-    printf("Call by Reference - Changing Number4\\n");
+    printf("Call by Reference - Changing Number3\\n");
     *num4 = 20;
-    printf("Number3 = %d, Number3 was 10 is affected by Number4\\n", num3);
-    printf("Number4 = %d\\n", *num4);
+    printf("Number3 = %d\\n", num3);
+    printf("Number4 = %d; Number4 is affected by Number3\\n", *num4);
     return 0;
 }`,
 };
