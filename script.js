@@ -2124,25 +2124,31 @@ class CInterpreter {
 }
 
   _checkHomogeneous(node){
-  const kinds=new Set();
-  const kindLines = {};
-  for(const it of node.items){
-    if(it && it.type==='arrlit') continue;
-    const k=this._literalKind(it);
-    if(k) {
-      if(!kindLines[k]) kindLines[k] = [];
-      kindLines[k].push(it.ln || '?');
-      kinds.add(k);
+    // Enforce homogeneous literal kinds within a plain array brace-initializer
+    // like `int arr[3] = {1, 2, 3};` or `{{1,2},{3,4}}`. This is intentionally
+    // ONLY ever reached for genuine array declarations — see call sites: it's
+    // invoked exclusively from _flattenInit(), which is itself only called on
+    // the top-level initializer of a real array (`d.isArr` in _execDecl, or
+    // `g.isArr` in _initGlobals). Struct literals such as
+    // `struct Student s = {"Anisur", 25, 4.56};` are handled by a completely
+    // separate branch in _execDecl that walks `d.init.items` field-by-field
+    // and only recurses into _flattenInit for an individual field that is
+    // itself a nested `{...}` (e.g. an array-typed struct field, which really
+    // is homogeneous by C's type system). So this check never fires for
+    // struct/union/enum initializers — only for actual arrays.
+    if(!node || node.type!=='arrlit') return;
+    let kind=null, kindLn=null;
+    for(const item of node.items){
+      if(item && item.type==='arrlit'){ this._checkHomogeneous(item); continue; }
+      const k=this._literalKind(item);
+      if(k===null) continue; // skip non-literal items (variables/expressions) — can't classify statically
+      if(kind===null){ kind=k; kindLn=item.ln; }
+      else if(kind!==k){
+        const ln=item.ln||kindLn||0;
+        throw new Error(`Use homogeneous data in array line at ${ln}`);
+      }
     }
   }
-  if(kinds.size>1){
-    const mixedKinds = Array.from(kinds);
-    const firstKind = mixedKinds[0];
-    const secondKind = mixedKinds[1];
-    const lineNum = kindLines[secondKind] ? kindLines[secondKind][0] : (kindLines[firstKind] ? kindLines[firstKind][0] : '?');
-    throw new Error(`Use homogeneous data in array line at ${lineNum}`);
-  }
-}
 
   _flattenInit(node,frame){
     if(node&&node.type==='arrlit'){
@@ -2173,18 +2179,60 @@ class CInterpreter {
     throw new Error(`error: '${name}' undeclared (first use in this function) (line ${line})`);
   }
 
-  _checkRedeclaration(name, frame, line, declNode) {
-    // Intentionally a no-op: this interpreter keeps one flat variable table
-    // per function call (no real per-block/per-for-loop scoping). That flat
-    // model can't tell a genuine duplicate declaration apart from the very
-    // common, perfectly legal C pattern of reusing an index name (i, j, k,
-    // ...) as the loop variable in separate, sequential for-loops within the
-    // same function — each `for (int i = ...)` has its own scope in real C,
-    // so re-declaring `i` in a later loop is not an error. Previously this
-    // threw a "redefinition" error for exactly that case. Rather than throw
-    // false positives, we simply let a later declaration re-initialize the
-    // variable (matching the "no error message, ever" behavior requested).
-    return;
+  // Builds a human-readable type string for a single declared variable,
+  // e.g. "int" or "int [10]" / "char [10]", used both to remember what a
+  // name was first declared as, and to report a real redefinition.
+  _declTypeStr(s, d, frame) {
+    let t = s.varType;
+    if (d.isArr) {
+      let sz = '';
+      try {
+        if (d.arrSize) {
+          const v = this._eval(d.arrSize, frame);
+          if (v !== undefined && v !== null) sz = String(v);
+        }
+      } catch (e) { /* size not evaluable yet — leave blank */ }
+      t += ` [${sz}]`;
+    }
+    return t;
+  }
+
+  _checkRedeclaration(s, d, frame) {
+    // Real redefinition detection: flag it only when the SAME variable name
+    // is declared twice in the same function scope with a genuinely
+    // DIFFERENT type (e.g. `int a[10];` followed by `char a[10];`) — that
+    // is an actual compiler error. Re-declaring a name with the exact same
+    // type (the common pattern of reusing `i`, `j`, `k`, ... as the loop
+    // variable in separate, sequential for-loops within the same function)
+    // is completely legal C and must NOT be flagged.
+    if (!frame) return;
+    if (!frame._declTypes) frame._declTypes = {};
+    const typeStr = this._declTypeStr(s, d, frame);
+    const prev = frame._declTypes[d.name];
+    if (prev) {
+      if (prev.type !== typeStr) {
+        const newSizeM = typeStr.match(/\[(.*)\]$/);
+        const prevSizeM = prev.type.match(/\[(.*)\]$/);
+        const newBase = newSizeM ? typeStr.slice(0, newSizeM.index).trim() : typeStr;
+        const prevBase = prevSizeM ? prev.type.slice(0, prevSizeM.index).trim() : prev.type;
+        const newDecl = `${newBase} ${d.name}${newSizeM ? `[${newSizeM[1]}]` : ''};`;
+        const prevDecl = `${prevBase} ${d.name}${prevSizeM ? `[${prevSizeM[1]}]` : ''};`;
+        throw new Error(
+          `/user-input:${s.ln}:1: error: redefinition of '${d.name}' with a different type: ` +
+          `'${typeStr}' vs '${prev.type}'<br>` +
+          `&nbsp;&nbsp;&nbsp;&nbsp;${newDecl}<br>` +
+          `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^<br>` +
+          `/user-input:${prev.line}:1: note: previous definition is here<br>` +
+          `&nbsp;&nbsp;&nbsp;&nbsp;${prevDecl}<br>` +
+          `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^`
+        );
+      }
+      // Same type re-declared (e.g. loop variable reused across separate
+      // loops, or the same decl re-executed on a subsequent loop
+      // iteration) — not an error, allow it silently.
+      return;
+    }
+    frame._declTypes[d.name] = { type: typeStr, line: s.ln };
   }
 
   _validateExprVariables(node, frame) {
@@ -2267,7 +2315,7 @@ class CInterpreter {
 
   _execDecl(s,frame){
     for(const d of s.decls){
-      this._checkRedeclaration(d.name, frame, s.ln, d);
+      this._checkRedeclaration(s, d, frame);
       
       let val;const vt=s.varType;
       if(vt==='va_list'){
@@ -2329,8 +2377,12 @@ class CInterpreter {
           //  - `struct Point p = {3, 4};`  -> a STRUCT literal. Structs are
           //    heterogeneous by design (each field has its own type), so
           //    this must NEVER go through the array homogeneity check.
-          //  - anything else (rare/malformed) falls back to the old array
-          //    flattening behavior.
+          //  - a genuinely unknown/mistyped struct type (e.g. `struct Stu`
+          //    when only `struct Student` was ever defined) — this must
+          //    raise a clear "unknown struct type" error rather than
+          //    silently falling through to array-literal parsing, which
+          //    would misfire the (correct, array-only) homogeneity check
+          //    against heterogeneous struct field values.
           const structName = vt.replace(/^struct\s+/, '').trim();
           const fields = this.structs[structName] || this.structs[vt];
           if (fields) {
@@ -2341,6 +2393,8 @@ class CInterpreter {
               obj[f.name] = item.type === 'arrlit' ? this._flattenInit(item, frame) : this._eval(item, frame);
             });
             val = obj;
+          } else if (/^struct\b/.test(vt)) {
+            throw new Error(`error: unknown type name 'struct ${structName}' — no 'struct ${structName} { ... };' was defined (line ${s.ln})`);
           } else {
             val = this._flattenInit(d.init, frame);
           }
