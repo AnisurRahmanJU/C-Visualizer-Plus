@@ -2269,7 +2269,7 @@ class CInterpreter {
         const newDecl = `${newBase} ${d.name}${newSizeM ? `[${newSizeM[1]}]` : ''};`;
         const prevDecl = `${prevBase} ${d.name}${prevSizeM ? `[${prevSizeM[1]}]` : ''};`;
         throw new Error(
-          `/user-input:${s.ln}:1: error: redefinition of '${d.name}' with a Datatype: ` +
+          `/user-input:${s.ln}:1: error: redefinition of '${d.name}' with a datatype: ` +
           `'${typeStr}' vs '${prev.type}'<br>` +
           `&nbsp;&nbsp;&nbsp;&nbsp;${newDecl}<br>` +
           `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^<br>` +
