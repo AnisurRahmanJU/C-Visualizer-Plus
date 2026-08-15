@@ -1627,7 +1627,7 @@ int main() {
     double x;
     double y;
 
-    printf("Enter two numbers (separated by space): ");
+    printf("Enter two numbers: ");
     scanf("%lf %lf", &x, &y);
 
     printf("\\nBasic & Advanced Roots:\\n");
