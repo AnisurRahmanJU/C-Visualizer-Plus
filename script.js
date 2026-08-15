@@ -1620,6 +1620,57 @@ int main() {
     printf("Memory freed.\\n");
     return 0;
 }`,
+math_libs:`#include <stdio.h>
+#include <math.h>
+
+int main() {
+    double x;
+    double y;
+
+    printf("Enter two numbers (separated by space): ");
+    scanf("%lf %lf", &x, &y);
+
+    printf("\\nBasic & Advanced Roots:\\n");
+    printf("Square root of x: %.4lf\\n", sqrt(x));
+    printf("Cube root of x: %.4lf\\n", cbrt(x));
+    printf("Hypotenuse (sqrt(x^2 + y^2)): %.4lf\\n", hypot(x, y));
+
+    printf("\\nPower & Exponential:\\n");
+    printf("x raised to power of y: %.4lf\\n", pow(x, y));
+    printf("e^x: %.4lf\\n", exp(x));
+    printf("2^x: %.4lf\\n", exp2(x));
+
+    printf("\\nLogarithms: \\n");
+    printf("Natural log ln(x): %.4lf\\n", log(x));
+    printf("Base-10 log log10(x): %.4lf\\n", log10(x));
+    printf("Base-2 log log2(x): %.4lf\\n", log2(x));
+
+    printf("\\nRounding & Absolute Value: \\n");
+    printf("Absolute value of x: %.4lf\\n", fabs(x));
+    printf("Ceiling (round up x): %.4lf\\n", ceil(x));
+    printf("Floor (round down x): %.4lf\\n", floor(x));
+    printf("Round to nearest integer x: %.4lf\\n", round(x));
+    printf("Truncate fractional part of x: %.4lf\\n", trunc(x));
+    printf("Remainder of x/y (fmod): %.4lf\\n", fmod(x, y));
+
+    printf("\\nBasic Trigonometry (Radians): \\n");
+    printf("Sine of x: %.4lf\\n", sin(x));
+    printf("Cosine of x: %.4lf\\n", cos(x));
+    printf("Tangent of x: %.4lf\\n", tan(x));
+
+    printf("\\nInverse Trigonometry (Radians): \\n");
+    printf("Arcsine of x: %.4lf\\n", asin(x));
+    printf("Arccosine of x: %.4lf\\n", acos(x));
+    printf("Arctangent of x: %.4lf\\n", atan(x));
+    printf("Four-quadrant arctangent (y/x): %.4lf\\n", atan2(y, x));
+
+    printf("\\nHyperbolic Functions: \\n");
+    printf("Hyperbolic sine of x: %.4lf\\n", sinh(x));
+    printf("Hyperbolic cosine of x: %.4lf\\n", cosh(x));
+    printf("Hyperbolic tangent of x: %.4lf\\n", tanh(x));
+
+    return 0;
+}`,   
 };
 
 // ─── Bit-width helpers ───────────────────────────────────────────────────────
