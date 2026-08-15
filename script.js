@@ -1670,7 +1670,28 @@ int main() {
     printf("Hyperbolic tangent of x: %.4lf\\n", tanh(x));
 
     return 0;
-}`,   
+}`,  
+
+callby_vr:`#include <stdio.h>
+
+int main() {
+    // Call by Value
+    int num1 = 10;
+    int num2 = num1;
+    printf("Call by Value- Changing Number2\\n");
+    printf("Number1 = %d\\n", num1);
+    num2 = 20;
+    printf("Number2 = %d, Only Number2 changed\\n\\n", num2);
+    
+    // Call by Reference
+    int num3 = 10;
+    int *num4 = &num3;
+    printf("Call by Reference- Changing Number4\\n");
+    *num4 = 20;
+    printf("Number3 = %d, Number3 was 10 is affected by Number4\\n", num3);
+    printf("Number4 = %d\\n", *num4);
+    return 0;
+}`,
 };
 
 // ─── Bit-width helpers ───────────────────────────────────────────────────────
