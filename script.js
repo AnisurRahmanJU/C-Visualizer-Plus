@@ -2248,42 +2248,122 @@ class CInterpreter {
     return t;
   }
 
-  _checkRedeclaration(s, d, frame) {
-    // Real redefinition detection: flag it only when the SAME variable name
-    // is declared twice in the same function scope with a genuinely
-    // DIFFERENT type (e.g. `int a[10];` followed by `char a[10];`) — that
-    // is an actual compiler error. Re-declaring a name with the exact same
-    // type (the common pattern of reusing `i`, `j`, `k`, ... as the loop
-    // variable in separate, sequential for-loops within the same function)
-    // is completely legal C and must NOT be flagged.
-    if (!frame) return;
-    if (!frame._declTypes) frame._declTypes = {};
-    const typeStr = this._declTypeStr(s, d, frame);
-    const prev = frame._declTypes[d.name];
-    if (prev) {
-      if (prev.type !== typeStr) {
-        const newSizeM = typeStr.match(/\[(.*)\]$/);
-        const prevSizeM = prev.type.match(/\[(.*)\]$/);
-        const newBase = newSizeM ? typeStr.slice(0, newSizeM.index).trim() : typeStr;
-        const prevBase = prevSizeM ? prev.type.slice(0, prevSizeM.index).trim() : prev.type;
-        const newDecl = `${newBase} ${d.name}${newSizeM ? `[${newSizeM[1]}]` : ''};`;
-        const prevDecl = `${prevBase} ${d.name}${prevSizeM ? `[${prevSizeM[1]}]` : ''};`;
-        throw new Error(
-          `/user-input:${s.ln}:1: error: redefinition of '${d.name}' with a different datatype: ` +
-          `'${typeStr}' vs '${prev.type}'<br>` +
-          `&nbsp;&nbsp;&nbsp;&nbsp;${newDecl}<br>` +
-          `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^<br>` +
-          `/user-input:${prev.line}:1: note: previous definition is here<br>` +
-          `&nbsp;&nbsp;&nbsp;&nbsp;${prevDecl}<br>` +
-          `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^`
-        );
+  // ── Lexical block scoping for redeclaration tracking ──────────────────────
+  // Every `{ ... }` block, every `for` loop (init clause + its iterations),
+  // and every `switch` body pushes a scope. A scope remembers exactly which
+  // names it declared ("own") and what those names resolved to in the
+  // enclosing scope before it shadowed them ("outerSaved"). When the scope
+  // ends we restore the enclosing view — this is what lets the same name
+  // (e.g. a loop counter `i`) be legally re-declared in a *sibling* scope
+  // (two separate `for` loops in the same function) while still catching a
+  // genuine duplicate declaration written twice in the *same* block.
+  _pushScope(frame) {
+    frame._declTypes = frame._declTypes || {};
+    frame._scopeStack = frame._scopeStack || [];
+    const scope = { own: new Map(), outerSaved: new Map() };
+    frame._scopeStack.push(scope);
+    return scope;
+  }
+  _popScope(frame, scope) {
+    if (!frame._scopeStack) return;
+    const idx = frame._scopeStack.lastIndexOf(scope);
+    if (idx !== -1) frame._scopeStack.splice(idx, 1);
+    for (const name of scope.own.keys()) {
+      if (scope.outerSaved.has(name)) {
+        const outer = scope.outerSaved.get(name);
+        if (outer === undefined) delete frame._declTypes[name];
+        else frame._declTypes[name] = outer;
+      } else {
+        delete frame._declTypes[name];
       }
-      // Same type re-declared (e.g. loop variable reused across separate
-      // loops, or the same decl re-executed on a subsequent loop
-      // iteration) — not an error, allow it silently.
+    }
+  }
+
+  // Builds the GCC-style two-part error ("redefinition ... / note: previous
+  // definition is here ...") for both the same-datatype and different-datatype
+  // cases.
+  _buildRedefError(s, d, prevRecord, typeStr, sameType) {
+    const newSizeM = typeStr.match(/\[(.*)\]$/);
+    const prevSizeM = prevRecord.type.match(/\[(.*)\]$/);
+    const newBase = newSizeM ? typeStr.slice(0, newSizeM.index).trim() : typeStr;
+    const prevBase = prevSizeM ? prevRecord.type.slice(0, prevSizeM.index).trim() : prevRecord.type;
+    const newDecl = `${newBase} ${d.name}${newSizeM ? `[${newSizeM[1]}]` : ''};`;
+    const prevDecl = `${prevBase} ${d.name}${prevSizeM ? `[${prevSizeM[1]}]` : ''};`;
+
+    if (sameType) {
+      return new Error(
+        `/user-input:${s.ln}:1: error: redefinition of '${d.name}' with a same datatype: '${typeStr}'<br>` +
+        `&nbsp;&nbsp;&nbsp;&nbsp;${newDecl}<br>` +
+        `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^<br>` +
+        `/user-input:${prevRecord.line}:1: note: previous definition is here<br>` +
+        `&nbsp;&nbsp;&nbsp;&nbsp;${prevDecl}<br>` +
+        `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^`
+      );
+    }
+    return new Error(
+      `/user-input:${s.ln}:1: error: redefinition of '${d.name}' with a different datatype: ` +
+      `'${typeStr}' vs '${prevRecord.type}'<br>` +
+      `&nbsp;&nbsp;&nbsp;&nbsp;${newDecl}<br>` +
+      `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^<br>` +
+      `/user-input:${prevRecord.line}:1: note: previous definition is here<br>` +
+      `&nbsp;&nbsp;&nbsp;&nbsp;${prevDecl}<br>` +
+      `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^`
+    );
+  }
+
+  _checkRedeclaration(s, d, frame) {
+    // Redefinition detection, matching real C block-scoping rules:
+    //  - Declaring the same name a SECOND time within the SAME lexical
+    //    scope is always an error — even when the datatype matches exactly
+    //    (e.g. `int matrix[2][2]; int matrix[2][2];` back to back in the
+    //    same block). This is the case that must be flagged now, in
+    //    addition to the pre-existing different-datatype case.
+    //  - Declaring the same name again in a DIFFERENT (sibling or nested)
+    //    scope — e.g. the loop counter `i` in two separate, sequential
+    //    `for` loops, or a decl inside a loop body that re-executes once
+    //    per iteration — is completely legal C and must NOT be flagged.
+    //    This is handled by _pushScope/_popScope: each block/for/switch
+    //    scope tracks only the names it itself declared ("own"), so a name
+    //    only conflicts with a PRIOR declaration made in that very same
+    //    scope, never with an enclosing or already-exited sibling scope.
+    if (!frame) return;
+    frame._declTypes = frame._declTypes || {};
+    const typeStr = this._declTypeStr(s, d, frame);
+    const scope = frame._scopeStack && frame._scopeStack.length
+      ? frame._scopeStack[frame._scopeStack.length - 1]
+      : null;
+
+    if (!scope) {
+      // Defensive fallback (should not normally happen — _callFn always
+      // pushes a function-level scope before executing a function body).
+      const prev = frame._declTypes[d.name];
+      if (prev) {
+        const sameType = prev.type === typeStr;
+        throw this._buildRedefError(s, d, prev, typeStr, sameType);
+      }
+      frame._declTypes[d.name] = { type: typeStr, line: s.ln };
       return;
     }
-    frame._declTypes[d.name] = { type: typeStr, line: s.ln };
+
+    const ownPrev = scope.own.get(d.name);
+    if (ownPrev) {
+      // A second, textually distinct declaration of the same name within
+      // THIS scope — a genuine redefinition error whether or not the
+      // datatype also matches.
+      const sameType = ownPrev.type === typeStr;
+      throw this._buildRedefError(s, d, ownPrev, typeStr, sameType);
+    }
+
+    // First declaration of this name within the current scope. Remember
+    // whatever this name resolved to in an enclosing scope (or nothing),
+    // so it can be restored once this scope ends — this is what makes
+    // shadowing / reusing a name in a sibling scope legal.
+    if (!scope.outerSaved.has(d.name)) {
+      scope.outerSaved.set(d.name, frame._declTypes[d.name]);
+    }
+    const record = { type: typeStr, line: s.ln };
+    scope.own.set(d.name, record);
+    frame._declTypes[d.name] = record;
   }
 
   _validateExprVariables(node, frame) {
@@ -2336,11 +2416,16 @@ class CInterpreter {
         this._functionScopes[name].add(p.name);
       }
     });
+    // Function-level scope: the base scope for the whole function body,
+    // so top-level `int x;` declarations use the same duplicate-detection
+    // path as nested block declarations.
+    const fnScope=this._pushScope(frame);
     this._callStack.push(frame);
     if(this._callStack.length>200) throw new Error('Stack overflow — possible infinite recursion in '+name+'()');
     this._addStep({ln:fn.line||1,desc:`Called <b>${name}(${args.map(a=>this._fv(a)).join(', ')})</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
     try{this._execBlock(fn.body,frame);}
     catch(e){if(e.type==='ret')frame.retVal=e.val;else if(e.type!=='break'&&e.type!=='cont')throw e;}
+    this._popScope(frame, fnScope);
     this._callStack.pop();
     this._addStep({ln:callSite?.ln||fn.line||1,desc:`<b>${name}()</b> returned ${frame.retVal!==undefined?this._fv(frame.retVal):'void'}`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
     return frame.retVal;
@@ -2350,7 +2435,17 @@ class CInterpreter {
 
   _execStmt(s,frame){
     switch(s.type){
-      case 'block':   this._execBlock(s.body,frame);break;
+      case 'block': {
+        // A bare `{ ... }` block (or the body of an `if`/`while`/`do`)
+        // introduces its own lexical scope: declarations made directly
+        // inside it are un-declared again once the block exits, so a
+        // sibling block (e.g. the next loop iteration, or an `else`
+        // branch) can freely reuse the same names.
+        const scope=this._pushScope(frame);
+        try { this._execBlock(s.body,frame); }
+        finally { this._popScope(frame,scope); }
+        break;
+      }
       case 'decl':    this._execDecl(s,frame);break;
       case 'expr':    this._execExprStmt(s,frame);break;
       case 'return':  this._execRet(s,frame);break;
@@ -2516,23 +2611,33 @@ class CInterpreter {
   }
 
   _execFor(s,frame){
-    if(s.init){if(s.init.type==='decl')this._execDecl(s.init,frame);else {
-      this._validateExprVariables(s.init, frame);
-      this._eval(s.init,frame);
-    }}
-    let iter=0;
-    while(iter++<2000){
-      if(s.cond){
-        this._validateExprVariables(s.cond, frame);
-        const c=this._eval(s.cond,frame);
-        this._addStep({ln:s.ln,desc:`<b>for</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
-        if(!c)break;
+    // The whole `for (init; cond; update) body` statement is one lexical
+    // scope, so a variable declared in the init clause (e.g. `int i`) is
+    // local to this loop only — it goes out of scope once the loop ends,
+    // letting a later, separate `for (int i = ...)` reuse the same name
+    // without triggering a redefinition error.
+    const scope=this._pushScope(frame);
+    try{
+      if(s.init){if(s.init.type==='decl')this._execDecl(s.init,frame);else {
+        this._validateExprVariables(s.init, frame);
+        this._eval(s.init,frame);
+      }}
+      let iter=0;
+      while(iter++<2000){
+        if(s.cond){
+          this._validateExprVariables(s.cond, frame);
+          const c=this._eval(s.cond,frame);
+          this._addStep({ln:s.ln,desc:`<b>for</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+          if(!c)break;
+        }
+        try{this._execStmt(s.body,frame);}catch(e){if(e.type==='break')break;if(e.type!=='cont')throw e;}
+        if(s.update){
+          this._validateExprVariables(s.update, frame);
+          this._eval(s.update,frame);
+        }
       }
-      try{this._execStmt(s.body,frame);}catch(e){if(e.type==='break')break;if(e.type!=='cont')throw e;}
-      if(s.update){
-        this._validateExprVariables(s.update, frame);
-        this._eval(s.update,frame);
-      }
+    } finally {
+      this._popScope(frame,scope);
     }
   }
 
@@ -2548,22 +2653,30 @@ class CInterpreter {
   }
 
   _execSwitch(s,frame){
-    this._validateExprVariables(s.disc, frame);
-    const dv=this._eval(s.disc,frame);
-    this._addStep({ln:s.ln,desc:`<b>switch</b> on value <b>${this._fv(dv)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
-    let matched=false;
+    // The entire switch body — across all `case`/`default` labels — is one
+    // lexical scope in real C (fall-through labels share declarations), so
+    // push a single scope for the whole statement rather than per-case.
+    const scope=this._pushScope(frame);
     try{
-      for(const c of s.cases){
-        if(!matched){ 
-          if(c.isDefault) matched=true; 
-          else {
-            this._validateExprVariables(c.val, frame);
-            if(this._eval(c.val,frame)===dv) matched=true; 
+      this._validateExprVariables(s.disc, frame);
+      const dv=this._eval(s.disc,frame);
+      this._addStep({ln:s.ln,desc:`<b>switch</b> on value <b>${this._fv(dv)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+      let matched=false;
+      try{
+        for(const c of s.cases){
+          if(!matched){ 
+            if(c.isDefault) matched=true; 
+            else {
+              this._validateExprVariables(c.val, frame);
+              if(this._eval(c.val,frame)===dv) matched=true; 
+            }
           }
+          if(matched){ this._execBlock(c.body,frame); }
         }
-        if(matched){ this._execBlock(c.body,frame); }
-      }
-    }catch(e){ if(e.type!=='break') throw e; }
+      }catch(e){ if(e.type!=='break') throw e; }
+    } finally {
+      this._popScope(frame,scope);
+    }
   }
 
   _eval(e,frame){
@@ -3745,6 +3858,7 @@ function drawArrows() {
 function setStatus(type, msg) {
   sbDot.style.color = type === 'ok' ? '#23d18b' : type === 'error' ? '#f48771' : 'rgba(255,255,255,.7)';
   sbTxt.textContent = msg;
+    
 }
 
 applyTheme('light');
