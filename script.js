@@ -1690,7 +1690,7 @@ int main() {
     printf("Call by Reference - Changing Number3\\n");
     printf("Number3 = %d\\n", num3);
     *num4 = 20;
-    printf("Number3 = %d\\nNumber3 is updated by Pointer Number4", num3);
+    printf("Number3 = %d\\nNumber3 is updated by Pointer Number4\\n", num3);
     printf("Number4 = %d\\nNumber4 is displayed by pointing to Number3\\n", *num4);
     return 0;
 }`,
