@@ -2292,7 +2292,7 @@ class CInterpreter {
 
     if (sameType) {
       return new Error(
-        `/user-input:${s.ln}:1: error: redefinition of '${d.name}' with a same datatype: '${typeStr}'<br>` +
+        `/user-input:${s.ln}:1: error: redefinition of '${d.name}' with a datatype: '${typeStr}'<br>` +
         `&nbsp;&nbsp;&nbsp;&nbsp;${newDecl}<br>` +
         `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^<br>` +
         `/user-input:${prevRecord.line}:1: note: previous definition is here<br>` +
@@ -2301,7 +2301,7 @@ class CInterpreter {
       );
     }
     return new Error(
-      `/user-input:${s.ln}:1: error: redefinition of '${d.name}' with a different datatype: ` +
+      `/user-input:${s.ln}:1: error: redefinition of '${d.name}' with a datatype: ` +
       `'${typeStr}' vs '${prevRecord.type}'<br>` +
       `&nbsp;&nbsp;&nbsp;&nbsp;${newDecl}<br>` +
       `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^<br>` +
