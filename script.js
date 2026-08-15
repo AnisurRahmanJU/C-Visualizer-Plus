@@ -1682,7 +1682,7 @@ int main() {
     printf("Call by Value - Changing Number2\\n");
     printf("Number1 = %d\\n", num1);
     num2 = 20;
-    printf("Number2 = %d,\\nOnly Number2 is changed by own\\n\\n", num2);
+    printf("Number2 = %d\\nOnly Number2 is changed by own\\n\\n", num2);
     
     // Call by Reference
     int num3 = 10;
@@ -1690,7 +1690,7 @@ int main() {
     printf("Call by Reference - Changing Number3\\n");
     *num4 = 20;
     printf("Number3 = %d\\n", num3);
-    printf("Number4 = %d,\\nNumber4 is changed by pointing to Number3\\n", *num4);
+    printf("Number4 = %d\\nNumber4 is changed by pointing to Number3\\n", *num4);
     return 0;
 }`,
 };
