@@ -1729,7 +1729,7 @@ int main() {
     printf("sizeof(c)   = %d\\n", (int)sizeof(char));
     printf("sizeof(str) = %d\\n", 5 * (int)sizeof(char));   
     printf("sizeof(d)   = %d\\n", (int)sizeof(double));
-    printf("sizeof(arr) = %d\\n",  (int)sizeof(arr));    
+    printf("sizeof(arr) = %d\\n", (int)sizeof(arr));    
     return 0;
 }`,
 };
