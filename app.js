@@ -1724,12 +1724,15 @@ int main() {
     char str[5] =  {'A', 'n', 'i', 's'};
     double d = 3.14;
     int arr[5] = {1, 2, 3, 4, 5};
+    int *ptr = &arr;
 
     printf("sizeof(a)   = %d bytes\\n", (int)sizeof(int));
     printf("sizeof(c)   = %d bytes\\n", (int)sizeof(char));
     printf("sizeof(str) = %d bytes\\n", 5 * (int)sizeof(char));   
     printf("sizeof(d)   = %d bytes\\n", (int)sizeof(double));
-    printf("sizeof(arr) = %d bytes\\n", (int)sizeof(arr));    
+    printf("sizeof(arr) = %d bytes\\n", (int)sizeof(arr));  
+    printf("sizeof(ptr to arr) = %d bytes\\n", (int)sizeof(*ptr));
+    printf("sizeof(ptr own)    = %d bytes\\n", 2*(int)sizeof(ptr));
     return 0;
 }`,
 };
