@@ -1748,6 +1748,13 @@ function bitWidthForType(type) {
   return 32;
 }
 
+// Formats a byte count in the human-friendly "1 Byte" / "N Bytes" style
+// instead of the terse "N B" abbreviation used previously.
+function formatBytes(n) {
+  const v = Math.trunc(Number(n) || 0);
+  return `${v} ${v === 1 ? 'Byte' : 'Bytes'}`;
+}
+
 function intToBinaryN(val, bits) {
   let n = Math.trunc(val);
   const mod = Math.pow(2, bits);
@@ -1831,6 +1838,42 @@ function fieldToDisplay(v2) {
   return String(v2);
 }
 
+// Computes a display-friendly byte size for a variable entry {type, value},
+// mirroring the same level of approximation used elsewhere in the app
+// (e.g. the interpreter's own sizeof() support). Handles scalars, pointers,
+// 1D/2D arrays, and struct instances. Returns "1 Byte" / "N Bytes" style
+// text via formatBytes().
+function sizeOfDisplay(v) {
+  const type = v.type || '';
+  const val = v.value;
+  if (type === 'va_list') return '—';
+  if (Array.isArray(val)) {
+    const is2D = val.length > 0 && Array.isArray(val[0]);
+    const elemBytes = Math.floor(bitWidthForType(type) / 8) || 4;
+    if (is2D) {
+      const rows = val.length;
+      const cols = val[0] ? val[0].length : 0;
+      return formatBytes(rows * cols * elemBytes);
+    }
+    return formatBytes(val.length * elemBytes);
+  }
+  if (val && typeof val === 'object') {
+    // struct instance — approximate by summing field sizes
+    let total = 0;
+    for (const fv of Object.values(val)) {
+      if (Array.isArray(fv)) {
+        const isCharLike = fv.length > 0 && fv.every(x => typeof x === 'number' && x >= 0 && x <= 255);
+        total += fv.length * (isCharLike ? 1 : 4);
+      } else {
+        total += 4;
+      }
+    }
+    return formatBytes(total);
+  }
+  if (type.includes('*')) return formatBytes(8); // pointer
+  return formatBytes(Math.floor(bitWidthForType(type) / 8));
+}
+
 // ─── C Interpreter ───────────────────────────────────────────────────────────
 class CInterpreter {
   constructor(code, stdinQ) {
@@ -1853,6 +1896,14 @@ class CInterpreter {
     this._vaListCallArgs = [];
     this._declaredVars = new Set();
     this._functionScopes = {};
+    // Tracks how many times each function has been entered (by name), so
+    // that exponential/naive recursion (e.g. a textbook recursive Fibonacci
+    // `fib(n) = fib(n-1) + fib(n-2)` with no memoization) is caught early
+    // instead of silently running to the global step cap. Linear recursion
+    // (factorial, gcd, single-branch tree walks, etc.) stays comfortably
+    // under this limit for any input a learner would realistically try.
+    this._fnCallCounts = {};
+    this._MAX_CALLS_PER_FN = 60;
     try { this._tokenize(); this._buildAST(); this._initGlobals(); this._run(); }
     catch(e) { this.errors.push(e.message || String(e)); }
   }
@@ -2467,6 +2518,25 @@ class CInterpreter {
   _callFn(name,args,callSite){
     const fn=this.functions[name];
     if(!fn)throw new Error('Undefined function: '+name+(callSite?.ln?(' (line '+callSite.ln+')'):''));
+
+    // Guard against naive exponential recursion (e.g. a textbook recursive
+    // Fibonacci with no memoization: fib(n) = fib(n-1) + fib(n-2)). Such
+    // functions call themselves so many times that the trace balloons into
+    // hundreds of steps for even modest inputs, which is both slow to
+    // generate and unhelpful to step through. Normal recursion (factorial,
+    // gcd, single-branch tree/list walks, divide-and-conquer sorts, etc.)
+    // stays well under this call count for realistic inputs, so this only
+    // triggers for genuinely exponential call patterns.
+    this._fnCallCounts[name] = (this._fnCallCounts[name] || 0) + 1;
+    if (this._fnCallCounts[name] > this._MAX_CALLS_PER_FN) {
+      throw new Error(
+        `Stopped: '${name}()' was called more than ${this._MAX_CALLS_PER_FN} times. ` +
+        `This usually means naive exponential recursion (e.g. a recursive Fibonacci ` +
+        `without memoization). Try a smaller input, or rewrite '${name}' iteratively ` +
+        `or with memoization.`
+      );
+    }
+
     const frame={name,vars:{},retVal:undefined,_variadicArgs:[]};
     const isVariadic=fn.params.some(p=>p.isVariadic);
     fn.params.forEach((p,i)=>{
@@ -3613,7 +3683,7 @@ function renderFrames(frames, chg) {
     } else {
       const tbl = document.createElement('table');
       tbl.className = 'vtbl';
-      tbl.innerHTML = `<thead><tr><th>Name</th><th class="col-type">Type</th><th>Value</th><th>Binary</th><th class="col-addr">Address</th></tr></thead>`;
+      tbl.innerHTML = `<thead><tr><th>Name</th><th class="col-type">Type</th><th>Value</th><th>Binary</th><th class="col-size">Size</th><th class="col-addr">Address</th></tr></thead>`;
       const tb = document.createElement('tbody');
 
       for (const [name, v] of entries) {
@@ -3669,6 +3739,7 @@ function renderFrames(frames, chg) {
           <td class="col-type"><span class="vt">${(v.type || '').replace(/</g,'&lt;')}</span></td>
           <td>${vhtml}</td>
           <td>${binHtml}</td>
+          <td class="col-size"><span class="vsize">${sizeOfDisplay(v)}</span></td>
           <td class="col-addr"><span class="vaddr">${v.addr || ''}</span></td>`;
         tb.appendChild(tr);
       }
@@ -3703,7 +3774,7 @@ function renderHeap(heap) {
     const hasStructData = block.data && Object.keys(block.data).some(k => k !== 'text');
     const head = document.createElement('div');
     head.className = 'hb-head';
-    head.innerHTML = `<i class="fa-solid fa-microchip" style="color:var(--vsc-orange);font-size:11px"></i><span class="h-addr">${addr}</span><span class="h-sz">${block.size} bytes</span>${segBadge('heap')}<span class="h-sz">${hasStructData ? 'struct' : (block.isChar ? 'char buffer' : 'int buffer')}</span><i class="fa-solid fa-up-down-left-right hb-grip" title="Drag to move"></i>`;
+    head.innerHTML = `<i class="fa-solid fa-microchip" style="color:var(--vsc-orange);font-size:11px"></i><span class="h-addr">${addr}</span><span class="h-sz">${formatBytes(block.size)}</span>${segBadge('heap')}<span class="h-sz">${hasStructData ? 'struct' : (block.isChar ? 'char buffer' : 'int buffer')}</span><i class="fa-solid fa-up-down-left-right hb-grip" title="Drag to move"></i>`;
     d.appendChild(head);
 
     if (hasStructData) {
@@ -3828,7 +3899,7 @@ function renderMM(frames, heap) {
     }
   }
   for (const [addr, b] of Object.entries(heap || {})) {
-    cells.push({ addr, name: 'heap', val: `${b.size}B`, cls: 'mm-hp' });
+    cells.push({ addr, name: 'heap', val: formatBytes(b.size), cls: 'mm-hp' });
   }
   if (!cells.length) {
     mmEl.innerHTML = '<div class="empty"><i class="fa-solid fa-map"></i><p>No memory allocated yet.</p></div>';
