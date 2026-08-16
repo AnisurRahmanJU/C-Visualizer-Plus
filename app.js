@@ -1700,7 +1700,7 @@ memory_address:`#include <stdio.h>
 int main() {
     int a = 10;
     char c = 'A';
-    char str[5] = "Anis";
+    char str[5] = {'A', 'n', 'i', 's'};
     double d = 3.14;
     int arr[5] = {1, 2, 3, 4, 5};
     int *e = &arr;
