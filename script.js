@@ -1694,6 +1694,44 @@ int main() {
     printf("Number4 = %d\\nNumber4 is displayed by pointing to Number3\\n", *num4);
     return 0;
 }`,
+
+memory_address:`#include <stdio.h>
+
+int main() {
+    int a = 10;
+    char c = 'A';
+    char str[5] = "Anis";
+    double d = 3.14;
+    int arr[5] = {1, 2, 3, 4, 5};
+    int *e = &arr;
+
+    printf("Address of a   = %p\\n", &a);
+    printf("Address of c   = %p\\n", &c);
+    printf("Address of str   = %p\\n", &str);
+    printf("Address of d   = %p\\n", &d);
+    printf("Address of arr = %p\\n", &arr);
+    printf("Address of e = %p\\n", &e);
+    
+
+    return 0;
+}`,
+
+memory_sizeof:`#include <stdio.h>
+
+int main() {
+    int a = 10;
+    char c = 'A';
+    char str[5] = "Anis";
+    double d = 3.14;
+    int arr[5] = {1, 2, 3, 4, 5};
+
+    printf("sizeof(int)    = %d\\n", (int)sizeof(int));
+    printf("sizeof(char)   = %d\\n", (int)sizeof(char));
+    printf("sizeof(str)    = %d\\n", 5 * (int)sizeof(char));   
+    printf("sizeof(double) = %d\\n", (int)sizeof(double));
+    printf("sizeof(arr)    = %d\\n",  (int)sizeof(arr));    
+    return 0;
+}`,
 };
 
 // ─── Bit-width helpers ───────────────────────────────────────────────────────
