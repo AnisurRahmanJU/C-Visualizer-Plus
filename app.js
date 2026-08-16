@@ -1725,11 +1725,11 @@ int main() {
     double d = 3.14;
     int arr[5] = {1, 2, 3, 4, 5};
 
-    printf("sizeof(a)   = %d\\n", (int)sizeof(int));
-    printf("sizeof(c)   = %d\\n", (int)sizeof(char));
-    printf("sizeof(str) = %d\\n", 5 * (int)sizeof(char));   
-    printf("sizeof(d)   = %d\\n", (int)sizeof(double));
-    printf("sizeof(arr) = %d\\n", (int)sizeof(arr));    
+    printf("sizeof(a)   = %d bytes\\n", (int)sizeof(int));
+    printf("sizeof(c)   = %d bytes\\n", (int)sizeof(char));
+    printf("sizeof(str) = %d bytes\\n", 5 * (int)sizeof(char));   
+    printf("sizeof(d)   = %d bytes\\n", (int)sizeof(double));
+    printf("sizeof(arr) = %d bytes\\n", (int)sizeof(arr));    
     return 0;
 }`,
 };
