@@ -1707,10 +1707,10 @@ int main() {
 
     printf("Address of a   = %p\\n", &a);
     printf("Address of c   = %p\\n", &c);
-    printf("Address of str   = %p\\n", &str);
+    printf("Address of str = %p\\n", &str);
     printf("Address of d   = %p\\n", &d);
     printf("Address of arr = %p\\n", &arr);
-    printf("Address of e = %p\\n", &e);
+    printf("Address of e   = %p\\n", &e);
     
 
     return 0;
