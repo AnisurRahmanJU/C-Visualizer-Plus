@@ -22,7 +22,7 @@
   style.textContent = `
     .cauto-ghost {
       opacity: 0.45;
-      font-style: italic;
+      font-style: normal;
       pointer-events: none;
       white-space: pre;
     }
