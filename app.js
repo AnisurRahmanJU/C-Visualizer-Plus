@@ -1732,7 +1732,7 @@ int main() {
     printf("sizeof(d)   = %d bytes\\n", (int)sizeof(double));
     printf("sizeof(arr) = %d bytes\\n", (int)sizeof(arr));  
     printf("sizeof(ptr to arr) = %d bytes\\n", (int)sizeof(*ptr));
-    printf("sizeof(ptr own)    = %d bytes\\n", 2*(int)sizeof(ptr));
+    printf("sizeof(ptr own)    = %d bytes\\n", (int)sizeof(ptr));
     return 0;
 }`,
 };
