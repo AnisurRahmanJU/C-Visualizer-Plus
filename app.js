@@ -1,4 +1,4 @@
-'use strict'; 
+'use strict';
 
 const SAMPLES = {
 memory_layout:`#include <stdio.h>
