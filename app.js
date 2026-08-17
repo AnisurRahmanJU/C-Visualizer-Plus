@@ -2820,7 +2820,7 @@ class CInterpreter {
       case 'clit':return e.v.charCodeAt(0);
       case 'slit':return e.v;
       case 'arrlit': return e.items.map(it=>it.type==='arrlit'?this._eval(it,frame):this._eval(it,frame));
-      case 'sizeof':return e.tp?this._szType(e.tp):this._szOf(this._eval(e.x,frame));
+      case 'sizeof':return e.tp?this._szType(e.tp):this._szOfExpr(e.x,frame);
       case 'id': {
         const n=e.n;
         if (this.functions[n]) return n;
@@ -3353,6 +3353,85 @@ class CInterpreter {
     return 4;
   }
   _szOf(v){if(Array.isArray(v))return v.length*4;return 4;}
+
+  // Resolves the size, in bytes, of a `sizeof(expr)` call where `expr` is a
+  // general expression (not a bare type name — that path is `_szType`
+  // instead). Arrays keep the original value-based sizing (length * element
+  // size), since a declared array type string alone doesn't carry the
+  // array's length. Everything else first tries to resolve the expression's
+  // *declared* C type (so `sizeof(ptr)` correctly reports 8 bytes for any
+  // pointer, regardless of what it points to) and falls back to the old
+  // "always 4" heuristic only when no declared type can be determined
+  // (e.g. sizeof of a computed expression like `a + b` or a function call).
+  _szOfExpr(node, frame) {
+    const val = this._eval(node, frame);
+    if (Array.isArray(val)) return this._szOf(val);
+
+    const declType = this._resolveDeclType(node, frame);
+    if (declType) return this._szType(declType);
+
+    return this._szOf(val);
+  }
+
+  // Walks an expression node and tries to find the C type string it was
+  // declared with, by looking up the underlying variable (or struct field)
+  // in scope. Returns null if no declared type can be determined, in which
+  // case the caller should fall back to value-based sizing.
+  _resolveDeclType(node, frame) {
+    if (!node) return null;
+
+    if (node.type === 'id') {
+      const n = node.n;
+      for (let i = this._callStack.length - 1; i >= 0; i--) {
+        const v = this._callStack[i].vars[n];
+        if (v !== undefined) return v.type;
+      }
+      if (this._globalFrame.vars[n] !== undefined) {
+        return this._globalFrame.vars[n].type;
+      }
+      return null;
+    }
+
+    if (node.type === 'deref') {
+      // sizeof(*p) where p is T* -> size of T (strip one '*')
+      const innerType = this._resolveDeclType(node.x, frame);
+      if (innerType && innerType.includes('*')) {
+        return innerType.replace(/\*\s*$/, '').trim();
+      }
+      return null;
+    }
+
+    if (node.type === 'sub') {
+      // sizeof(arr[i]) -> element type. Arrays are stored without the '[]'
+      // in .type (e.g. "int"), and pointers indexed like arrays (p[i])
+      // should also lose one level of '*'.
+      const baseType = this._resolveDeclType(node.x, frame);
+      if (baseType && baseType.includes('*')) {
+        return baseType.replace(/\*\s*$/, '').trim();
+      }
+      return baseType; // arrays: element type == declared type already
+    }
+
+    if (node.type === 'mem' || node.type === 'pmem') {
+      // sizeof(structVar.field) / sizeof(structPtr->field): look up the
+      // struct definition and find the field's declared type.
+      const baseType = this._resolveDeclType(node.x, frame);
+      if (!baseType) return null;
+      const structName = baseType.replace(/^struct\s+/, '').replace(/\*+$/, '').trim();
+      const fields = this.structs[structName];
+      if (!fields) return null;
+      const f = fields.find(f2 => f2.name === node.f);
+      return f ? f.type : null;
+    }
+
+    if (node.type === 'cast') {
+      // sizeof((int*)x) -> just use the cast type directly.
+      return node.ct;
+    }
+
+    return null; // literals, binary ops, calls, etc. — no static type to resolve
+  }
+
   _fv(v,type){
     if(v===null)return'NULL';
     if(Array.isArray(v))return'['+v.slice(0,6).map(x=>Array.isArray(x)?'['+x.slice(0,4).join(',')+']':x).join(', ')+(v.length>6?'…':'')+']';
@@ -3954,6 +4033,7 @@ function drawArrows() {
     const srcRow = src.closest('tr') || src.closest('.heap-block') || src;
     if (srcRow === tgtEl) return;
 
+      
     const anchor = src.querySelector('.arrow-anchor') || src;
     const ar = anchor.getBoundingClientRect();
     const tr = tgtEl.getBoundingClientRect();
