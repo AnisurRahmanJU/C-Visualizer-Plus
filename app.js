@@ -4033,7 +4033,6 @@ function drawArrows() {
     const srcRow = src.closest('tr') || src.closest('.heap-block') || src;
     if (srcRow === tgtEl) return;
 
-      
     const anchor = src.querySelector('.arrow-anchor') || src;
     const ar = anchor.getBoundingClientRect();
     const tr = tgtEl.getBoundingClientRect();
@@ -4053,6 +4052,7 @@ function drawArrows() {
       y2 = tr.top - containerRect.top;
     }
 
+      
     const dx = Math.max(36, Math.abs(x2 - x1) * 0.5);
     const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
