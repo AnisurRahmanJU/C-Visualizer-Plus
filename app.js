@@ -250,6 +250,28 @@ int main() {
     printf("Final: %d\\n", total);
     return 0;
 }`,
+pattern:`#include <stdio.h>
+
+int main() {
+    int a, b;
+    int g = 7;
+
+    for (a = 1; a <= g; a++) {
+        for (b = 1; b <= g; b++) {
+           
+            if (a == 3 || b == 3 || a == g - 2 || b == g - 2 || a == b || a + b == g + 1 ||
+                ((a == 1 || a == 2 || a == 3 || a == g || a == g - 1) && 
+                 (b == 1 || b == 2 || b == 3 || b == g || b == g - 1))) {
+                printf("*  ");
+            } else {
+                printf("   "); 
+            }
+        }
+        printf("\\n"); 
+    }
+
+    return 0;
+}`,
 switch_case:`#include <stdio.h>
 
 int main() {
