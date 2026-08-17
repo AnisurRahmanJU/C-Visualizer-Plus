@@ -1738,14 +1738,16 @@ memory_address:`#include <stdio.h>
 int main() {
     int a = 10;
     char c = 'A';
-    char str[5] = {'A', 'n', 'i', 's'};
-    double d = 3.14;
+    char str[5] = "Anis";
+    float f = 3.14f;
+    double d = 5.1234;
     int arr[5] = {1, 2, 3, 4, 5};
     int *e = &arr;
 
     printf("Address of a   = %p\\n", &a);
     printf("Address of c   = %p\\n", &c);
     printf("Address of str = %p\\n", &str);
+    printf("Address of f   = %p\\n", &f);
     printf("Address of d   = %p\\n", &d);
     printf("Address of arr = %p\\n", &arr);
     printf("Address of e   = %p\\n", &e);
@@ -1759,14 +1761,16 @@ memory_sizeof:`#include <stdio.h>
 int main() {
     int a = 10;
     char c = 'A';
-    char str[5] =  {'A', 'n', 'i', 's'};
-    double d = 3.14;
+    char str[5] =  "Anis";
+    float f = 3.14f;
+    double d = 5.1234;
     int arr[5] = {1, 2, 3, 4, 5};
     int *ptr = &arr;
 
     printf("sizeof(a)   = %d bytes\\n", (int)sizeof(int));
     printf("sizeof(c)   = %d bytes\\n", (int)sizeof(char));
-    printf("sizeof(str) = %d bytes\\n", 5 * (int)sizeof(char));   
+    printf("sizeof(str) = %d bytes\\n", 5 * (int)sizeof(char)); 
+    printf("sizeof(f)   = %d bytes\\n", (int)sizeof(float));
     printf("sizeof(d)   = %d bytes\\n", (int)sizeof(double));
     printf("sizeof(arr) = %d bytes\\n", (int)sizeof(arr));  
     printf("sizeof(ptr to arr) = %d bytes\\n", (int)sizeof(*ptr));
