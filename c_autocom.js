@@ -33,6 +33,22 @@
   let activeBookmark = null;
   let activeSuggestion = null;
 
+  function getUserIdentifiers() {
+    const text = cm.getValue();
+    const re = /[A-Za-z_][A-Za-z0-9_]*/g;
+    const seen = new Set();
+    const result = [];
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      const w = match[0];
+      if (WORDS.indexOf(w) !== -1) continue;
+      if (seen.has(w)) continue;
+      seen.add(w);
+      result.push(w);
+    }
+    return result;
+  }
+
   function clearSuggestion() {
     if (activeBookmark) {
       activeBookmark.clear();
@@ -62,7 +78,13 @@
     if (prefix.length < 1) return null;
     if (isInStringOrComment(pos)) return null;
 
-    const match = WORDS.find(w => w.length > prefix.length && w.toLowerCase().startsWith(prefix.toLowerCase()));
+    let match = WORDS.find(w => w.length > prefix.length && w.toLowerCase().startsWith(prefix.toLowerCase()));
+
+    if (!match) {
+      const userIds = getUserIdentifiers();
+      match = userIds.find(w => w.length > prefix.length && w.startsWith(prefix));
+    }
+
     if (!match) return null;
 
     return {
