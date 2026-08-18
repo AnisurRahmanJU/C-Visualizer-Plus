@@ -1,6 +1,29 @@
 (function attachCAutocomplete(cm) {
   if (!cm) { console.warn('C Autocomplete: cmEditor not found.'); return; }
 
+
+  
+  function isMobileDevice() {
+    const ua = navigator.userAgent || navigator.vendor || '';
+    const uaLooksMobile = /Android|iPhone|iPad|iPod|IEMobile|BlackBerry|Opera Mini|Mobile/i.test(ua);
+
+
+    
+    const isCoarsePointer = typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse)').matches;
+    const isTouchOnly = (('ontouchstart' in window) || navigator.maxTouchPoints > 0) &&
+      typeof window.matchMedia === 'function' &&
+      !window.matchMedia('(pointer: fine)').matches;
+
+    return uaLooksMobile || (isCoarsePointer && isTouchOnly);
+  }
+
+  if (isMobileDevice()) {
+    console.log('C Autocomplete: skipped (mobile/touch device detected, desktop-only feature).');
+    return;
+  }
+  // -------------------------------------------------------------------------
+
   const WORDS = [
     'int', 'float', 'double', 'char', 'long', 'short',
     'unsigned', 'signed', 'void', 'const', 'static', 'extern',
