@@ -117,6 +117,15 @@
   <button class="tb-btn" id="clear-btn" title="Clear editor">
     <i class="fa-solid fa-file-circle-plus"></i><span>New</span>
   </button>
+  <div class="zoom-group" aria-label="Editor zoom controls">
+    <button class="tb-btn icon-only" id="zoom-out-btn" type="button" title="Zoom out code (Ctrl+-)" aria-label="Zoom out">
+      <i class="fa-solid fa-magnifying-glass-minus"></i>
+    </button>
+    <span class="zoom-level" id="zoom-level" aria-live="polite">100%</span>
+    <button class="tb-btn icon-only" id="zoom-in-btn" type="button" title="Zoom in code (Ctrl+=)" aria-label="Zoom in">
+      <i class="fa-solid fa-magnifying-glass-plus"></i>
+    </button>
+  </div>
   <div class="tb-spacer"></div>
   <button class="tb-btn primary" id="run-btn">
     <i class="fa-solid fa-play"></i><span>Visualize</span>
@@ -258,5 +267,119 @@
 </div>
 <script src="app.js"></script>
 <script src="c_autocom.js"></script>
+
+<!-- Inline editor zoom: C code + line numbers, up to 500%. -->
+<script>
+(function () {
+  const zoomInBtn = document.getElementById('zoom-in-btn');
+  const zoomOutBtn = document.getElementById('zoom-out-btn');
+  const zoomLabel = document.getElementById('zoom-level');
+
+  if (!zoomInBtn || !zoomOutBtn) return;
+
+  let zoom = 100;
+  const MIN_ZOOM = 50;
+  const MAX_ZOOM = 500;
+  const STEP = 10;
+  const BASE_FONT_SIZE = 14;
+  const BASE_LINE_HEIGHT = 21;
+
+  // IMPORTANT:
+  // app.js declares `const cmEditor`, so another <script> cannot access it
+  // because top-level const variables are not properties of window.
+  // Therefore this zoom code works only through the CodeMirror DOM.
+  function getCodeMirror() {
+    return document.querySelector('#editor-panel .CodeMirror, .CodeMirror');
+  }
+
+  function applyEditorZoom() {
+    const cm = getCodeMirror();
+    if (!cm) return;
+
+    const fontSize = BASE_FONT_SIZE * zoom / 100;
+    const lineHeight = BASE_LINE_HEIGHT * zoom / 100;
+
+    // Store zoom values on the CodeMirror wrapper.
+    cm.style.setProperty('--c-zoom-font-size', fontSize + 'px');
+    cm.style.setProperty('--c-zoom-line-height', lineHeight + 'px');
+
+    // Zoom C source text.
+    cm.querySelectorAll('.CodeMirror-code pre').forEach(function (el) {
+      el.style.setProperty('font-size', fontSize + 'px', 'important');
+      el.style.setProperty('line-height', lineHeight + 'px', 'important');
+    });
+
+    // Zoom line numbers by exactly the same amount.
+    cm.querySelectorAll('.CodeMirror-linenumber').forEach(function (el) {
+      el.style.setProperty('font-size', fontSize + 'px', 'important');
+      el.style.setProperty('line-height', lineHeight + 'px', 'important');
+    });
+
+    // Keep gutter metrics synchronized.
+    const gutters = cm.querySelector('.CodeMirror-gutters');
+    if (gutters) {
+      gutters.style.setProperty('font-size', fontSize + 'px', 'important');
+      gutters.style.setProperty('line-height', lineHeight + 'px', 'important');
+    }
+
+    // app.js already has a window resize listener which calls cmEditor.refresh().
+    // Trigger it without needing access to the private `cmEditor` variable.
+    window.dispatchEvent(new Event('resize'));
+
+    zoomLabel.textContent = zoom + '%';
+    zoomOutBtn.disabled = zoom <= MIN_ZOOM;
+    zoomInBtn.disabled = zoom >= MAX_ZOOM;
+  }
+
+  function setZoom(value) {
+    zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));
+    applyEditorZoom();
+  }
+
+  zoomInBtn.addEventListener('click', function () {
+    setZoom(zoom + STEP);
+  });
+
+  zoomOutBtn.addEventListener('click', function () {
+    setZoom(zoom - STEP);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (!(e.ctrlKey || e.metaKey)) return;
+
+    if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      setZoom(zoom + STEP);
+    } else if (e.key === '-') {
+      e.preventDefault();
+      setZoom(zoom - STEP);
+    } else if (e.key === '0') {
+      e.preventDefault();
+      setZoom(100);
+    }
+  });
+
+  // CodeMirror can recreate line-number DOM nodes when the sample C code
+  // changes. Reapply the current zoom automatically.
+  const observer = new MutationObserver(function () {
+    applyEditorZoom();
+  });
+
+  function startZoomObserver() {
+    const cm = getCodeMirror();
+    if (!cm) {
+      setTimeout(startZoomObserver, 50);
+      return;
+    }
+    observer.observe(cm.querySelector('.CodeMirror-scroll') || cm, {
+      childList: true,
+      subtree: true
+    });
+    applyEditorZoom();
+  }
+
+  startZoomObserver();
+})();
+</script>
 </body>
 </html>
