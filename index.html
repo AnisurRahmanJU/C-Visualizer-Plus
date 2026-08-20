@@ -268,14 +268,14 @@
 <script src="app.js"></script>
 <script src="c_autocom.js"></script>
 
-<!-- Inline editor zoom: C code + line numbers, up to 500%. -->
 <script>
 (function () {
   const zoomInBtn = document.getElementById('zoom-in-btn');
   const zoomOutBtn = document.getElementById('zoom-out-btn');
   const zoomLabel = document.getElementById('zoom-level');
+  const cmHost = document.getElementById('cm-host');
 
-  if (!zoomInBtn || !zoomOutBtn) return;
+  if (!zoomInBtn || !zoomOutBtn || !cmHost) return;
 
   let zoom = 100;
   const MIN_ZOOM = 50;
@@ -284,47 +284,27 @@
   const BASE_FONT_SIZE = 14;
   const BASE_LINE_HEIGHT = 21;
 
-  // IMPORTANT:
-  // app.js declares `const cmEditor`, so another <script> cannot access it
-  // because top-level const variables are not properties of window.
-  // Therefore this zoom code works only through the CodeMirror DOM.
-  function getCodeMirror() {
-    return document.querySelector('#editor-panel .CodeMirror, .CodeMirror');
+
+  function getCM() {
+    const wrapper = cmHost.querySelector('.CodeMirror');
+    return wrapper && wrapper.CodeMirror ? wrapper.CodeMirror : null;
   }
 
   function applyEditorZoom() {
-    const cm = getCodeMirror();
-    if (!cm) return;
-
     const fontSize = BASE_FONT_SIZE * zoom / 100;
     const lineHeight = BASE_LINE_HEIGHT * zoom / 100;
 
-    // Store zoom values on the CodeMirror wrapper.
-    cm.style.setProperty('--c-zoom-font-size', fontSize + 'px');
-    cm.style.setProperty('--c-zoom-line-height', lineHeight + 'px');
+    cmHost.style.setProperty('--code-font-size', fontSize + 'px');
+    cmHost.style.setProperty('--code-line-height', lineHeight + 'px');
 
-    // Zoom C source text.
-    cm.querySelectorAll('.CodeMirror-code pre').forEach(function (el) {
-      el.style.setProperty('font-size', fontSize + 'px', 'important');
-      el.style.setProperty('line-height', lineHeight + 'px', 'important');
-    });
-
-    // Zoom line numbers by exactly the same amount.
-    cm.querySelectorAll('.CodeMirror-linenumber').forEach(function (el) {
-      el.style.setProperty('font-size', fontSize + 'px', 'important');
-      el.style.setProperty('line-height', lineHeight + 'px', 'important');
-    });
-
-    // Keep gutter metrics synchronized.
-    const gutters = cm.querySelector('.CodeMirror-gutters');
-    if (gutters) {
-      gutters.style.setProperty('font-size', fontSize + 'px', 'important');
-      gutters.style.setProperty('line-height', lineHeight + 'px', 'important');
+    const cm = getCM();
+    if (cm) {
+    
+      cm.refresh();
+    } else {
+   
+      window.dispatchEvent(new Event('resize'));
     }
-
-    // app.js already has a window resize listener which calls cmEditor.refresh().
-    // Trigger it without needing access to the private `cmEditor` variable.
-    window.dispatchEvent(new Event('resize'));
 
     zoomLabel.textContent = zoom + '%';
     zoomOutBtn.disabled = zoom <= MIN_ZOOM;
@@ -359,26 +339,29 @@
     }
   });
 
-  // CodeMirror can recreate line-number DOM nodes when the sample C code
-  // changes. Reapply the current zoom automatically.
-  const observer = new MutationObserver(function () {
-    applyEditorZoom();
-  });
+ 
+  let refreshTimer = null;
+  function scheduleRefresh() {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(function () {
+      const cm = getCM();
+      if (cm) cm.refresh();
+    }, 120);
+  }
 
-  function startZoomObserver() {
-    const cm = getCodeMirror();
+  const observer = new MutationObserver(scheduleRefresh);
+
+  function start() {
+    const cm = getCM();
     if (!cm) {
-      setTimeout(startZoomObserver, 50);
+      setTimeout(start, 50);
       return;
     }
-    observer.observe(cm.querySelector('.CodeMirror-scroll') || cm, {
-      childList: true,
-      subtree: true
-    });
+    observer.observe(cmHost, { childList: true, subtree: true });
     applyEditorZoom();
   }
 
-  startZoomObserver();
+  start();
 })();
 </script>
 </body>
