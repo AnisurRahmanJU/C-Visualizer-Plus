@@ -3161,20 +3161,46 @@ class CInterpreter {
       case 'fgets':return args[2];
     }
 
-    if(typeof fnName==='string' && this.functions[fnName])
+    // ── Recursive/normal user-function call: highlight the CALL SITE first ──
+    // Previously, a user-defined function was invoked directly via
+    // `_callFn(fnName,args,e.fn)` with no step added at the caller's own
+    // line beforehand. For a statement like `return n * factorial(n - 1);`,
+    // `_eval()` fully resolves the call (walking all the way down through
+    // the recursion) BEFORE `_execRet()` adds its own "return ..." step —
+    // so the line containing the recursive call itself was never
+    // highlighted at the moment the call was actually being made; the
+    // green indicator only ever appeared on the callee's own body line
+    // (via `_callFn`'s "Called ..." step) and, afterwards, back on the
+    // original line once the whole expression had already finished
+    // evaluating. This meant every recursive call "skipped" showing the
+    // caller's line as the point of the call.
+    //
+    // Fix: right before diving into `_callFn`, add a step highlighting the
+    // call-site line (`ln`, taken from the call's own token position) with
+    // a short "About to call ..." description. This makes each recursive
+    // step in `factorial(5) -> factorial(4) -> ... -> factorial(1)` visibly
+    // highlight the exact line making the call, before stepping into the
+    // callee — matching how a learner traces recursion by hand.
+    if(typeof fnName==='string' && this.functions[fnName]){
+      this._addStep({ln,desc:`About to call <b>${fnName}(${args.map(a=>this._fv(a)).join(', ')})</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
       return this._callFn(fnName,args,e.fn);
+    }
 
     if(e.fn.type==='id'){
       const fnRef=this._eval(e.fn,frame);
-      if(typeof fnRef==='string'&&this.functions[fnRef])
+      if(typeof fnRef==='string'&&this.functions[fnRef]){
+        this._addStep({ln,desc:`About to call <b>${fnRef}(${args.map(a=>this._fv(a)).join(', ')})</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
         return this._callFn(fnRef,args,e.fn);
+      }
     }
     if(e.fn.type==='sub'){
       const arr=this._eval(e.fn.x,frame);
       const idx=this._eval(e.fn.i,frame);
       const fnPtr=Array.isArray(arr)?arr[idx]:null;
-      if(typeof fnPtr==='string'&&this.functions[fnPtr])
+      if(typeof fnPtr==='string'&&this.functions[fnPtr]){
+        this._addStep({ln,desc:`About to call <b>${fnPtr}(${args.map(a=>this._fv(a)).join(', ')})</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
         return this._callFn(fnPtr,args,e.fn);
+      }
     }
 
     if(['main'].includes(fnName))return 0;
