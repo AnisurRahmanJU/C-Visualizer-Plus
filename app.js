@@ -343,18 +343,19 @@ int main() {
     printf("Sum = %d\\n", sum);
     return 0;
 }`,
-"2darray":`#include <stdio.h>
-
-int main() {
-    int grid[2][3] = {{1,2,3},{4,5,6}};
-    int i, j;
-    for (i = 0; i < 2; i++) {
-        for (j = 0; j < 3; j++) {
-            grid[i][j] = grid[i][j] + 1;
-            printf("grid[%d][%d] = %d\\n", i, j, grid[i][j]);
+"2darray":`#include <stdio.h>  
+int main()
+{
+    int i,j;
+    int num[2][2] = {10,20,30,40};
+    
+    for (i = 0; i < 2; i++)
+    {
+        for (j = 0; j < 2; j++)
+        {  
+            printf("value of num[%d] [%d] : %d\n",i,j,num[i][j]);
         }
     }
-    return 0;
 }`,
     
 matrix_2d:`#include <stdio.h>
