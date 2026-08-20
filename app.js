@@ -2469,20 +2469,6 @@ class CInterpreter {
   }
 
   _checkRedeclaration(s, d, frame) {
-    // Redefinition detection, matching real C block-scoping rules:
-    //  - Declaring the same name a SECOND time within the SAME lexical
-    //    scope is always an error — even when the datatype matches exactly
-    //    (e.g. `int matrix[2][2]; int matrix[2][2];` back to back in the
-    //    same block). This is the case that must be flagged now, in
-    //    addition to the pre-existing different-datatype case.
-    //  - Declaring the same name again in a DIFFERENT (sibling or nested)
-    //    scope — e.g. the loop counter `i` in two separate, sequential
-    //    `for` loops, or a decl inside a loop body that re-executes once
-    //    per iteration — is completely legal C and must NOT be flagged.
-    //    This is handled by _pushScope/_popScope: each block/for/switch
-    //    scope tracks only the names it itself declared ("own"), so a name
-    //    only conflicts with a PRIOR declaration made in that very same
-    //    scope, never with an enclosing or already-exited sibling scope.
     if (!frame) return;
     frame._declTypes = frame._declTypes || {};
     const typeStr = this._declTypeStr(s, d, frame);
@@ -2491,8 +2477,6 @@ class CInterpreter {
       : null;
 
     if (!scope) {
-      // Defensive fallback (should not normally happen — _callFn always
-      // pushes a function-level scope before executing a function body).
       const prev = frame._declTypes[d.name];
       if (prev) {
         const sameType = prev.type === typeStr;
@@ -2504,17 +2488,10 @@ class CInterpreter {
 
     const ownPrev = scope.own.get(d.name);
     if (ownPrev) {
-      // A second, textually distinct declaration of the same name within
-      // THIS scope — a genuine redefinition error whether or not the
-      // datatype also matches.
       const sameType = ownPrev.type === typeStr;
       throw this._buildRedefError(s, d, ownPrev, typeStr, sameType);
     }
 
-    // First declaration of this name within the current scope. Remember
-    // whatever this name resolved to in an enclosing scope (or nothing),
-    // so it can be restored once this scope ends — this is what makes
-    // shadowing / reusing a name in a sibling scope legal.
     if (!scope.outerSaved.has(d.name)) {
       scope.outerSaved.set(d.name, frame._declTypes[d.name]);
     }
@@ -2564,14 +2541,6 @@ class CInterpreter {
     const fn=this.functions[name];
     if(!fn)throw new Error('Undefined function: '+name+(callSite?.ln?(' (line '+callSite.ln+')'):''));
 
-    // Guard against naive exponential recursion (e.g. a textbook recursive
-    // Fibonacci with no memoization: fib(n) = fib(n-1) + fib(n-2)). Such
-    // functions call themselves so many times that the trace balloons into
-    // hundreds of steps for even modest inputs, which is both slow to
-    // generate and unhelpful to step through. Normal recursion (factorial,
-    // gcd, single-branch tree/list walks, divide-and-conquer sorts, etc.)
-    // stays well under this call count for realistic inputs, so this only
-    // triggers for genuinely exponential call patterns.
     this._fnCallCounts[name] = (this._fnCallCounts[name] || 0) + 1;
     if (this._fnCallCounts[name] > this._MAX_CALLS_PER_FN) {
       throw new Error(
@@ -2592,9 +2561,6 @@ class CInterpreter {
         this._functionScopes[name].add(p.name);
       }
     });
-    // Function-level scope: the base scope for the whole function body,
-    // so top-level `int x;` declarations use the same duplicate-detection
-    // path as nested block declarations.
     const fnScope=this._pushScope(frame);
     this._callStack.push(frame);
     if(this._callStack.length>200) throw new Error('Stack overflow — possible infinite recursion in '+name+'()');
@@ -2612,11 +2578,6 @@ class CInterpreter {
   _execStmt(s,frame){
     switch(s.type){
       case 'block': {
-        // A bare `{ ... }` block (or the body of an `if`/`while`/`do`)
-        // introduces its own lexical scope: declarations made directly
-        // inside it are un-declared again once the block exits, so a
-        // sibling block (e.g. the next loop iteration, or an `else`
-        // branch) can freely reuse the same names.
         const scope=this._pushScope(frame);
         try { this._execBlock(s.body,frame); }
         finally { this._popScope(frame,scope); }
@@ -2635,7 +2596,16 @@ class CInterpreter {
     }
   }
 
-  _execDecl(s,frame){
+  // `opts.silent` (used only by the for-loop init/update clauses) executes
+  // the declaration's side effects — validation, redeclaration checking,
+  // value construction, and storing into frame.vars — WITHOUT emitting its
+  // own step. This lets `_execFor` add exactly one unified step tagged
+  // `part:'for-init'` for the whole clause instead of two back-to-back
+  // steps (a generic "Declare ..." step immediately followed by a
+  // redundant for-init step) that would otherwise fight over the
+  // highlight and flicker between the whole-statement box and the small
+  // for-clause box.
+  _execDecl(s,frame,opts={}){
     for(const d of s.decls){
       this._checkRedeclaration(s, d, frame);
       
@@ -2643,7 +2613,7 @@ class CInterpreter {
       if(vt==='va_list'){
         frame.vars[d.name]={type:'va_list',value:'<va_list>',addr:this._nextAddr(),seg:'stack',_vaIdx:0,_declNode:d};
         this._declaredVars.add(d.name);
-        this._addStep({ln:s.ln,desc:`Declare <code>va_list ${d.name}</code> (variadic arg list)`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d.name});
+        if(!opts.silent) this._addStep({ln:s.ln,desc:`Declare <code>va_list ${d.name}</code> (variadic arg list)`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d.name});
         continue;
       }
       if(s.isStatic){
@@ -2737,7 +2707,7 @@ class CInterpreter {
         this._functionScopes[frame.name].add(d.name);
       }
       if(s.isStatic) this._staticStore[frame.name+'::'+d.name]=entry;
-      this._addStep({ln:s.ln,desc:`Declare <code>${s.isStatic?'static ':''}${vt} ${d.name}</code>${d.init?` = <b>${this._fv(val, vt)}</b>`:''}`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d.name});
+      if(!opts.silent) this._addStep({ln:s.ln,desc:`Declare <code>${s.isStatic?'static ':''}${vt} ${d.name}</code>${d.init?` = <b>${this._fv(val, vt)}</b>`:''}`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d.name});
       frame.vars[d.name].changed=false;
     }
   }
@@ -2771,7 +2741,7 @@ class CInterpreter {
   _execIf(s,frame){
     this._validateExprVariables(s.cond, frame);
     const c=this._eval(s.cond,frame);
-    this._addStep({ln:s.ln,desc:`<b>if</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+    this._addStep({ln:s.ln,part:'cond-paren',kw:'if',desc:`<b>if</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
     if(c)this._execStmt(s.then,frame);else if(s.else)this._execStmt(s.else,frame);
   }
 
@@ -2780,36 +2750,57 @@ class CInterpreter {
     while(iter++<2000){
       this._validateExprVariables(s.cond, frame);
       const c=this._eval(s.cond,frame);
-      this._addStep({ln:s.ln,desc:`<b>while</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+      this._addStep({ln:s.ln,part:'cond-paren',kw:'while',desc:`<b>while</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
       if(!c)break;
       try{this._execStmt(s.body,frame);}catch(e){if(e.type==='break')break;if(e.type!=='cont')throw e;}
     }
   }
 
+  // The for-loop is broken into four distinct, individually-highlighted
+  // phases — exactly mirroring how a learner reads `for (init; cond; upd)`:
+  //   1. for-init   — runs once, highlighted to just the init clause text
+  //   2. for-cond   — runs before every iteration (and the final, failing
+  //                   check that ends the loop), highlighted to the cond
+  //                   clause text
+  //   3. body       — the loop body's own statements, each already
+  //                   highlighted individually via the normal statement path
+  //   4. for-update — runs after every iteration's body, highlighted to
+  //                   the update clause text
+  // Each phase is tagged with `part` so the front-end knows to compute a
+  // tight sub-range highlight (via extractForClauses) instead of the
+  // whole-line/whole-statement box used elsewhere.
   _execFor(s,frame){
-    // The whole `for (init; cond; update) body` statement is one lexical
-    // scope, so a variable declared in the init clause (e.g. `int i`) is
-    // local to this loop only — it goes out of scope once the loop ends,
-    // letting a later, separate `for (int i = ...)` reuse the same name
-    // without triggering a redefinition error.
     const scope=this._pushScope(frame);
     try{
-      if(s.init){if(s.init.type==='decl')this._execDecl(s.init,frame);else {
-        this._validateExprVariables(s.init, frame);
-        this._eval(s.init,frame);
-      }}
+      if(s.init){
+        if(s.init.type==='decl'){
+          this._execDecl(s.init,frame,{silent:true});
+          const d=s.init.decls[0];
+          const val=d && frame.vars[d.name] ? frame.vars[d.name].value : undefined;
+          this._addStep({ln:s.ln,part:'for-init',desc:`<b>for-init:</b> declare <code>${s.init.varType} ${d?d.name:''}</code>${val!==undefined?` = <b>${this._fv(val)}</b>`:''}`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:d?d.name:undefined});
+        } else {
+          this._validateExprVariables(s.init, frame);
+          const v=this._eval(s.init,frame);
+          const nm=this._exprName(s.init.type==='bin'?s.init.l:s.init);
+          this._addStep({ln:s.ln,part:'for-init',desc:`<b>for-init:</b> <code>${nm}</code> &rarr; <b>${this._fv(v)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:nm});
+        }
+      }
       let iter=0;
       while(iter++<2000){
         if(s.cond){
           this._validateExprVariables(s.cond, frame);
           const c=this._eval(s.cond,frame);
-          this._addStep({ln:s.ln,desc:`<b>for</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+          this._addStep({ln:s.ln,part:'for-cond',desc:`<b>for-condition</b> is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
           if(!c)break;
         }
         try{this._execStmt(s.body,frame);}catch(e){if(e.type==='break')break;if(e.type!=='cont')throw e;}
         if(s.update){
           this._validateExprVariables(s.update, frame);
-          this._eval(s.update,frame);
+          const v=this._eval(s.update,frame);
+          const targetNode = (s.update.type==='post'||s.update.type==='pre') ? s.update.x
+                            : (s.update.type==='bin' ? s.update.l : s.update);
+          const nm=this._exprName(targetNode);
+          this._addStep({ln:s.ln,part:'for-update',desc:`<b>for-update:</b> <code>${nm}</code> &rarr; now <b>${this._fv(v)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:nm});
         }
       }
     } finally {
@@ -2823,20 +2814,17 @@ class CInterpreter {
       try{this._execStmt(s.body,frame);}catch(e){if(e.type==='break')break;if(e.type!=='cont')throw e;}
       this._validateExprVariables(s.cond, frame);
       const c=this._eval(s.cond,frame);
-      this._addStep({ln:s.ln,desc:`<b>do-while</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+      this._addStep({ln:s.ln,part:'cond-paren',kw:'while',desc:`<b>do-while</b> condition is <b>${c?'true ✓':'false ✗'}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
       if(!c)break;
     }while(iter++<2000);
   }
 
   _execSwitch(s,frame){
-    // The entire switch body — across all `case`/`default` labels — is one
-    // lexical scope in real C (fall-through labels share declarations), so
-    // push a single scope for the whole statement rather than per-case.
     const scope=this._pushScope(frame);
     try{
       this._validateExprVariables(s.disc, frame);
       const dv=this._eval(s.disc,frame);
-      this._addStep({ln:s.ln,desc:`<b>switch</b> on value <b>${this._fv(dv)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+      this._addStep({ln:s.ln,part:'cond-paren',kw:'switch',desc:`<b>switch</b> on value <b>${this._fv(dv)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
       let matched=false;
       try{
         for(const c of s.cases){
@@ -2994,7 +2982,7 @@ class CInterpreter {
           return{get:()=>blk.arr[idx]??0,set:v=>{
             blk.arr[idx]=v;
             blk.data[idx]=v;
-            if(blk.init) blk.init[idx]=true; // mark cell as written so the UI stops showing '?'
+            if(blk.init) blk.init[idx]=true;
           }};
         }
       }
@@ -3005,7 +2993,7 @@ class CInterpreter {
         return{get:()=>blk.arr[idx]??0,set:v=>{
           blk.arr[idx]=v;
           blk.data[idx]=v;
-          if(blk.init) blk.init[idx]=true; // mark cell as written so the UI stops showing '?'
+          if(blk.init) blk.init[idx]=true;
         }};
       }
     }
@@ -3017,7 +3005,7 @@ class CInterpreter {
         if(!blk.arr)blk.arr=[];
         return{get:()=>blk.arr[0]??0,set:v=>{
           blk.arr[0]=v;
-          if(blk.init) blk.init[0]=true; // mark cell as written so the UI stops showing '?'
+          if(blk.init) blk.init[0]=true;
         }};
       }
       for(const f of[...this._callStack,this._globalFrame]){if(!f)continue;for(const[k,v]of Object.entries(f.vars)){if(v.addr===ptr)return{get:()=>v.value,set:nv=>{v.value=nv;v.changed=true;}};}}
@@ -3205,11 +3193,6 @@ class CInterpreter {
     return out.length;
   }
 
-  // Writes a scalar value to the memory cell identified by `addr` — used by
-  // scanf() to store into whatever &var / &arr[i] / &struct.field resolved
-  // to. Mirrors the same two lookup paths used everywhere else in the
-  // interpreter (an addr-cell created by &-of a non-plain-id expression, or
-  // a plain stack/global variable whose .addr matches).
   _writeScalar(addr, value) {
     if (this._addrCells && this._addrCells[addr]) {
       this._addrCells[addr].set(value);
@@ -3226,14 +3209,6 @@ class CInterpreter {
 
   _scanf(args,callSite,frame){
     const fmt=args[0]||'';
-    // Match every real conversion spec: %[flags][width][.precision][length]conv
-    // Length modifiers (l, ll, h, hh, L, j, z, t) and any width/precision are
-    // now captured and consumed correctly, so formats like %lf, %.2f, %.6lf,
-    // %ld, %hu, %u, %x, %c, %s, %p etc. are all recognized. The previous
-    // regex only matched a bare %[diouxXeEfgGcsp] directly after the '%',
-    // so ANY spec with a length modifier — including the very common %lf
-    // for a double — produced zero matches, meaning scanf() silently read
-    // nothing and never prompted for input at all.
     const specRe = /%[-+0 #]*\d*(?:\.\d+)?(hh|h|ll|l|L|j|z|t)?([diouxXeEfFgGaAcsp])/g;
     const specs = [];
     let m;
@@ -3257,21 +3232,16 @@ class CInterpreter {
 
       let displayVal, wrote=false;
       if(conv==='s'){
-        // %s: read one whitespace-delimited token and write it as a
-        // null-terminated C string into the destination buffer (array or
-        // heap block) — reuses the same writer strcpy() uses.
         const word = raw.trim().split(/\s+/)[0] || '';
         this._writeCString(target, word);
         displayVal = `"${word.replace(/</g,'&lt;')}"`;
         wrote = true;
       } else if(conv==='c'){
-        // %c: exactly one character, stored as its char code.
         const ch = raw.length>0 ? raw[0] : '\0';
         const code = ch.charCodeAt(0) || 0;
         wrote = this._writeScalar(target, code);
         displayVal = `'${ch==='\0'?'\\0':ch}'`;
       } else if(conv==='p'){
-        // %p: store the entered address/text as-is.
         const val = raw.trim();
         wrote = this._writeScalar(target, val);
         displayVal = val || 'NULL';
@@ -3279,9 +3249,6 @@ class CInterpreter {
         const trimmed = raw.trim();
         let parsed;
         if(['f','F','e','E','g','G','a','A'].includes(conv)){
-          // %f/%lf/%.2f/%.6lf/%e/%g/... — all floating point forms (float
-          // or double — JS numbers don't distinguish the width, but the
-          // parsed value is correct either way).
           parsed = parseFloat(trimmed); if(isNaN(parsed)) parsed = 0;
         } else if(conv==='x'||conv==='X'){
           parsed = parseInt(trimmed,16) || 0;
@@ -3289,7 +3256,7 @@ class CInterpreter {
           parsed = parseInt(trimmed,8) || 0;
         } else if(conv==='u'){
           parsed = Math.abs(parseInt(trimmed,10) || 0);
-        } else { // d, i  (and their l/ll/h/hh length-modified forms: %ld, %lld, %hd...)
+        } else {
           parsed = parseInt(trimmed,10) || 0;
         }
         wrote = this._writeScalar(target, parsed);
@@ -3396,15 +3363,6 @@ class CInterpreter {
   }
   _szOf(v){if(Array.isArray(v))return v.length*4;return 4;}
 
-  // Resolves the size, in bytes, of a `sizeof(expr)` call where `expr` is a
-  // general expression (not a bare type name — that path is `_szType`
-  // instead). Arrays keep the original value-based sizing (length * element
-  // size), since a declared array type string alone doesn't carry the
-  // array's length. Everything else first tries to resolve the expression's
-  // *declared* C type (so `sizeof(ptr)` correctly reports 8 bytes for any
-  // pointer, regardless of what it points to) and falls back to the old
-  // "always 4" heuristic only when no declared type can be determined
-  // (e.g. sizeof of a computed expression like `a + b` or a function call).
   _szOfExpr(node, frame) {
     const val = this._eval(node, frame);
     if (Array.isArray(val)) return this._szOf(val);
@@ -3415,10 +3373,6 @@ class CInterpreter {
     return this._szOf(val);
   }
 
-  // Walks an expression node and tries to find the C type string it was
-  // declared with, by looking up the underlying variable (or struct field)
-  // in scope. Returns null if no declared type can be determined, in which
-  // case the caller should fall back to value-based sizing.
   _resolveDeclType(node, frame) {
     if (!node) return null;
 
@@ -3435,7 +3389,6 @@ class CInterpreter {
     }
 
     if (node.type === 'deref') {
-      // sizeof(*p) where p is T* -> size of T (strip one '*')
       const innerType = this._resolveDeclType(node.x, frame);
       if (innerType && innerType.includes('*')) {
         return innerType.replace(/\*\s*$/, '').trim();
@@ -3444,19 +3397,14 @@ class CInterpreter {
     }
 
     if (node.type === 'sub') {
-      // sizeof(arr[i]) -> element type. Arrays are stored without the '[]'
-      // in .type (e.g. "int"), and pointers indexed like arrays (p[i])
-      // should also lose one level of '*'.
       const baseType = this._resolveDeclType(node.x, frame);
       if (baseType && baseType.includes('*')) {
         return baseType.replace(/\*\s*$/, '').trim();
       }
-      return baseType; // arrays: element type == declared type already
+      return baseType;
     }
 
     if (node.type === 'mem' || node.type === 'pmem') {
-      // sizeof(structVar.field) / sizeof(structPtr->field): look up the
-      // struct definition and find the field's declared type.
       const baseType = this._resolveDeclType(node.x, frame);
       if (!baseType) return null;
       const structName = baseType.replace(/^struct\s+/, '').replace(/\*+$/, '').trim();
@@ -3467,11 +3415,10 @@ class CInterpreter {
     }
 
     if (node.type === 'cast') {
-      // sizeof((int*)x) -> just use the cast type directly.
       return node.ct;
     }
 
-    return null; // literals, binary ops, calls, etc. — no static type to resolve
+    return null;
   }
 
   _fv(v,type){
@@ -3538,6 +3485,171 @@ const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), 
 });
 cmEditor.setValue(SAMPLES.memory_layout);
 cmEditor.setSize('100%', '100%');
+
+// ─── Step-indicator styling ────────────────────────────────────────────────
+// Injected once here so the execution highlight styling is always available
+// regardless of the host page's stylesheet.
+(function injectExecSegmentStyles(){
+  if (document.getElementById('exec-segment-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'exec-segment-styles';
+  style.textContent = `
+    .cm-exec-line {
+      background: rgba(80, 200, 120, 0.25) !important;
+      border-radius: 4px;
+    }
+    [data-theme="dark"] .cm-exec-line {
+      background: rgba(80, 220, 140, 0.2) !important;
+    }
+    .cm-exec-gutter::before {
+      content: '▶';
+      color: #2ea05a;
+      font-size: 11px;
+      display: inline-block;
+      width: 100%;
+      text-align: center;
+      margin-left: -4px;
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+// Tracks the single live CodeMirror markText range used for the
+// execution indicator, so each new step can clear the previous one before
+// drawing its own.
+let execMark = null;
+
+// Finds `for ( init ; cond ; update )` on a single source line and returns
+// the three clauses' character ranges (relative to that line), so a for-loop
+// step can be highlighted down to just the piece of the header currently
+// executing (matching how a person would trace the loop by hand: first the
+// init, then the condition, then — after the body runs — the update, then
+// the condition again, and so on until the loop ends).
+//
+// Splitting on ';' only counts at paren/bracket depth 0 within the header,
+// so a condition like `for (i = f(a; b); ...)` (unusual, but harmless to
+// guard against) or an array index inside the header doesn't get split in
+// the wrong place.
+function extractForClauses(lineText) {
+  if (!lineText) return null;
+  const forMatch = /\bfor\b/.exec(lineText);
+  if (!forMatch) return null;
+  const parenStart = lineText.indexOf('(', forMatch.index);
+  if (parenStart === -1) return null;
+
+  let depth = 0, parenEnd = -1;
+  for (let i = parenStart; i < lineText.length; i++) {
+    const c = lineText[i];
+    if (c === '(') depth++;
+    else if (c === ')') { depth--; if (depth === 0) { parenEnd = i; break; } }
+  }
+  if (parenEnd === -1) return null;
+
+  const inner = lineText.slice(parenStart + 1, parenEnd);
+  const parts = [];
+  let depth2 = 0, last = 0;
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i];
+    if (c === '(' || c === '[') depth2++;
+    else if (c === ')' || c === ']') depth2--;
+    else if (c === ';' && depth2 === 0) { parts.push(inner.slice(last, i)); last = i + 1; }
+  }
+  parts.push(inner.slice(last));
+  if (parts.length !== 3) return null;
+
+  const clauses = [];
+  let offset = parenStart + 1;
+  for (const p of parts) {
+    const leadWs = p.length - p.replace(/^\s+/, '').length;
+    const trimmed = p.trim();
+    const start = offset + leadWs;
+    const end = start + trimmed.length;
+    clauses.push(trimmed.length ? { start, end } : null);
+    offset += p.length + 1; // +1 skips the ';' that followed this clause
+  }
+  return clauses;
+}
+
+// Finds the `( ... )` clause immediately following a keyword like `if`,
+// `while`, or `switch` on a single line, and returns its inner (paren-
+// excluded) character range. Used to give if/while/switch conditions the
+// same tight treatment as for-loop clauses, rather than highlighting
+// the whole statement.
+function extractParenClauseAfter(lineText, keyword) {
+  if (!lineText) return null;
+  const re = new RegExp('\\b' + keyword + '\\b');
+  const kwMatch = re.exec(lineText);
+  if (!kwMatch) return null;
+  const parenStart = lineText.indexOf('(', kwMatch.index);
+  if (parenStart === -1) return null;
+  let depth = 0, parenEnd = -1;
+  for (let i = parenStart; i < lineText.length; i++) {
+    const c = lineText[i];
+    if (c === '(') depth++;
+    else if (c === ')') { depth--; if (depth === 0) { parenEnd = i; break; } }
+  }
+  if (parenEnd === -1) return null;
+  const inner = lineText.slice(parenStart + 1, parenEnd);
+  const leadWs = inner.length - inner.replace(/^\s+/, '').length;
+  const trimmed = inner.trim();
+  if (!trimmed.length) return null;
+  const start = parenStart + 1 + leadWs;
+  return { start, end: start + trimmed.length };
+}
+
+// Computes the { line, chStart, chEnd } range to spotlight for a given
+// interpreter step. For-loop init/condition/update phases resolve to just
+// that clause inside the `for (...)` header; if/while/switch conditions
+// resolve to just the parenthesized expression; everything else falls back
+// to the statement's trimmed text on its line (i.e. the whole line minus
+// leading/trailing whitespace) — still a tight box, just without needing to
+// parse sub-clauses out of it.
+function computeHighlightRange(step) {
+  const lineIdx = (step.ln || 1) - 1;
+  const lineText = cmEditor.getLine(lineIdx);
+  if (lineText === undefined || lineText === null) return null;
+
+  if (step.part === 'for-init' || step.part === 'for-cond' || step.part === 'for-update') {
+    const clauses = extractForClauses(lineText);
+    if (clauses) {
+      const idx = step.part === 'for-init' ? 0 : step.part === 'for-cond' ? 1 : 2;
+      const cl = clauses[idx];
+      if (cl) return { line: lineIdx, chStart: cl.start, chEnd: cl.end };
+    }
+  } else if (step.part === 'cond-paren' && step.kw) {
+    const cl = extractParenClauseAfter(lineText, step.kw);
+    if (cl) return { line: lineIdx, chStart: cl.start, chEnd: cl.end };
+  }
+
+  const trimmedStart = lineText.search(/\S/);
+  if (trimmedStart === -1) return null;
+  const trimmedEnd = lineText.replace(/\s+$/, '').length;
+  if (trimmedEnd <= trimmedStart) return null;
+  return { line: lineIdx, chStart: trimmedStart, chEnd: trimmedEnd };
+}
+
+// Draws the execution indicator for the given step, replacing whatever was
+// drawn for the previous step. Uses a single green rectangle for the entire
+// statement being executed (or clause in for-loop), not word-by-word.
+function highlightSegment(step) {
+  if (execMark) { try { execMark.clear(); } catch(e){} execMark = null; }
+  clearLineHL();
+  if (!step || !step.ln || step.ln < 1) return;
+
+  const range = computeHighlightRange(step);
+  if (!range) { highlightLine(step.ln); return; }
+
+  execLine = step.ln;
+  try {
+    cmEditor.addLineClass(range.line, 'gutter', 'cm-exec-gutter');
+    execMark = cmEditor.markText(
+      { line: range.line, ch: range.chStart },
+      { line: range.line, ch: range.chEnd },
+      { className: 'cm-exec-line' }
+    );
+    cmEditor.scrollIntoView({ line: range.line, ch: range.chStart }, 80);
+  } catch(e) { /* line/ch out of range — silently skip */ }
+}
 
 // ── Element refs ─────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -3661,6 +3773,7 @@ function resetViz() {
   clearLineHL(); updateCtrl(); setStatus('', 'Ready');
   sbLine.textContent = '—'; sbStep.textContent = '—'; sbFrames.textContent = '0';
   if (arrowSvg) arrowSvg.innerHTML = '';
+  if (execMark) { try { execMark.clear(); } catch(e){} execMark = null; }
 }
 
 function clearOutput() {
@@ -3719,7 +3832,7 @@ document.addEventListener('keydown', e => {
 function renderStep(idx) {
   const step = interp.steps[idx]; if (!step) return;
   showWalk('', step.desc || '');
-  highlightLine(step.ln);
+  highlightSegment(step);
   sbLine.textContent = step.ln || '—';
   outputArea.textContent = step.out && step.out.length ? step.out : '— no output yet —';
   renderFrames(step.frames, step.chg);
@@ -3746,6 +3859,7 @@ function clearLineHL() {
     try { cmEditor.removeLineClass(execLine - 1, 'background', 'cm-exec-line'); cmEditor.removeLineClass(execLine - 1, 'gutter', 'cm-exec-gutter'); } catch(e){}
     execLine = null;
   }
+  if (execMark) { try { execMark.clear(); } catch(e){} execMark = null; }
 }
 
 function showWalk(type, html) {
