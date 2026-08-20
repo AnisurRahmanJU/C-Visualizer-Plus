@@ -226,15 +226,21 @@ int main() {
     return 0;
 }`,
 for_loop:`#include <stdio.h>
-
-int main() {
-    int sum = 0;
+int main() 
+{
     int i;
-    for (i = 1; i <= 5; i++) {
-        sum = sum + i;
-        printf("i=%d, sum=%d\\n", i, sum);
+    int j;
+    int n;
+    printf("Enter a number:");
+    scanf("%d", &n);
+    for (i = 1; i <= n; i++) 
+    {
+        for (j = 1; j <= i; j++) 
+        {
+            printf("%d ", j); 
+        }
+        printf("\\n");
     }
-    printf("Total: %d\\n", sum);
     return 0;
 }`,
 while_loop:`#include <stdio.h>
