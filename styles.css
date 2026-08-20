@@ -64,6 +64,45 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
 .tb-btn.icon-only{padding:5px 8px;font-size:14px;}
 .tb-btn:disabled{opacity:.38;cursor:not-allowed;pointer-events:none;}
 .tb-btn i{font-size:13px;}
+
+/* Code editor zoom controls */
+.zoom-group{
+    display:flex;
+    align-items:center;
+    gap:2px;
+    flex-shrink:0;
+    padding:2px;
+    border:1px solid var(--vsc-border2);
+    border-radius:4px;
+    background:var(--vsc-input);
+}
+.zoom-group .tb-btn{
+    padding:4px 7px;
+    min-width:28px;
+    justify-content:center;
+}
+.zoom-group .tb-btn:hover{background:var(--vsc-hover);}
+.zoom-level{
+    min-width:42px;
+    text-align:center;
+    color:var(--text2);
+    font-family:'Inter',sans-serif;
+    font-size:10.5px;
+    font-weight:600;
+    user-select:none;
+}
+
+#cm-host{--code-font-size:13.5px;--code-line-height:22px;}
+#cm-host .CodeMirror,
+#cm-host .CodeMirror pre{
+    font-size:var(--code-font-size) !important;
+    line-height:var(--code-line-height) !important;
+}
+#cm-host .CodeMirror-linenumber{
+    font-size:var(--code-font-size) !important;
+    line-height:var(--code-line-height) !important;
+}
+#cm-host .CodeMirror-lines{padding-top:4px;padding-bottom:4px;}
 #app{display:flex;height:calc(100vh - 48px - 22px);overflow:hidden;}
 #editor-panel{display:flex;flex-direction:column;width:52%;min-width:280px;max-width:80%;background:var(--vsc-panel);border-right:1px solid var(--vsc-border);overflow:hidden;flex-shrink:0;position:relative;}
 .editor-tabs{height:35px;background:var(--vsc-sidebar);border-bottom:1px solid var(--vsc-border);display:flex;align-items:stretch;overflow-x:auto;flex-shrink:0;}
