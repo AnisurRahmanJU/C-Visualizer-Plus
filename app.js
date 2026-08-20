@@ -3495,15 +3495,27 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 });
 
 const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), {
+const IS_TOUCH_DEVICE = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), {
   mode: 'text/x-csrc',
   theme: 'one-dark',
   lineNumbers: true,
   matchBrackets: true,
-  autoCloseBrackets: true,
+  // Autocorrect/auto-close-brackets fight with mobile IME composition and
+  // are a common cause of "typing does nothing" on phones — disable on touch.
+  autoCloseBrackets: !IS_TOUCH_DEVICE,
   styleActiveLine: true,
   indentUnit: 4,
   tabSize: 4,
   indentWithTabs: false,
+  // THE KEY FIX: 'textarea' (the default) hides an off-screen <textarea>
+  // that mobile Safari/Chrome frequently refuse to focus on tap inside
+  // flex/grid layouts, which is exactly what makes typing silently fail
+  // and the editor look like it "auto hides". 'contenteditable' edits a
+  // real, visible, focusable DOM node instead — the standard fix for
+  // CodeMirror 5 on mobile.
+  inputStyle: IS_TOUCH_DEVICE ? 'contenteditable' : 'textarea',
   extraKeys: {
     'Tab': cm => cm.execCommand('indentMore'),
     'Shift-Tab': cm => cm.execCommand('indentLess'),
@@ -3511,11 +3523,46 @@ const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), 
     'Ctrl-Enter': () => runVisualize(),
     'Cmd-Enter': () => runVisualize()
   },
-  lineWrapping: false,
+  lineWrapping: IS_TOUCH_DEVICE,
   scrollbarStyle: 'native'
 });
 cmEditor.setValue(SAMPLES.memory_layout);
 cmEditor.setSize('100%', '100%');
+
+// ── Mobile focus/keyboard reliability ──────────────────────────────────────
+// 1) Some mobile browsers eat the first tap on CodeMirror's wrapper without
+//    focusing the editor (it goes to a scroll/gutter element instead).
+//    Force-focus on any tap inside the editor's DOM as a fallback.
+const cmWrapperEl = cmEditor.getWrapperElement();
+cmWrapperEl.addEventListener('touchend', (ev) => {
+  if (!cmEditor.hasFocus()) {
+    cmEditor.focus();
+    // Put the cursor at the tapped position, not just position 0.
+    const pos = cmEditor.coordsChar({ left: ev.changedTouches[0].clientX, top: ev.changedTouches[0].clientY });
+    cmEditor.setCursor(pos);
+  }
+}, { passive: true });
+
+// 2) When the on-screen keyboard opens/closes on mobile, the visual
+//    viewport height changes but the layout height often doesn't — this is
+//    what makes a fixed-height editor panel appear to "collapse" or hide
+//    behind the keyboard. Refresh CodeMirror's layout and keep the cursor
+//    in view whenever the visual viewport resizes.
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    cmEditor.refresh();
+    if (cmEditor.hasFocus()) {
+      cmEditor.scrollIntoView(cmEditor.getCursor(), 40);
+    }
+  });
+}
+
+// 3) iOS in particular can report a stale layout right after the keyboard
+//    animates in; a short delayed refresh after any focus event fixes
+//    editors that render 0-height or clipped on first tap.
+cmEditor.on('focus', () => {
+  setTimeout(() => { cmEditor.refresh(); }, 300);
+});
 
 // ─── Step-indicator styling ────────────────────────────────────────────────
 // Injected once here so the execution highlight styling is always available
