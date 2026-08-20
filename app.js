@@ -231,7 +231,7 @@ int main()
     int i;
     int j;
     int n;
-    printf("Enter a number:");
+    printf("Enter a number: ");
     scanf("%d", &n);
     for (i = 1; i <= n; i++) 
     {
