@@ -353,7 +353,7 @@ int main()
     {
         for (j = 0; j < 2; j++)
         {  
-            printf("value of num[%d] [%d] : %d\n",i,j,num[i][j]);
+            printf("value of num[%d] [%d] : %d\\n",i,j,num[i][j]);
         }
     }
 }`,
