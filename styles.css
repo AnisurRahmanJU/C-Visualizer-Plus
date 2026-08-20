@@ -92,6 +92,14 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
     user-select:none;
 }
 
+/* ── Zoom-driven code sizing ──────────────────────────────────────────────
+   --code-font-size / --code-line-height are the single source of truth for
+   editor text size, updated by the inline zoom script in index.html. Every
+   rule below reads from these variables (never hard-codes a px size) so
+   that ALL of CodeMirror's <pre> nodes stay in sync — including the hidden
+   `.CodeMirror-measure` node CodeMirror uses to translate clicks into text
+   offsets. If any one of these nodes falls out of sync with the others,
+   clicking / cursor placement / backspace will target the wrong character. */
 #cm-host{--code-font-size:13.5px;--code-line-height:22px;}
 #cm-host .CodeMirror,
 #cm-host .CodeMirror pre{
@@ -112,8 +120,14 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
 .e-tab.active::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:var(--vsc-tab-border);}
 .e-tab i{font-size:12px;opacity:.7;}
 #cm-host{flex:1;overflow:hidden;position:relative;}
-[data-theme="dark"] .CodeMirror{background:#1e1e1e !important;color:#d4d4d4 !important;height:100% !important;font-family:'Fira Code','Cascadia Code','Consolas',monospace !important;font-size:13.5px !important;line-height:22px !important;}
-[data-theme="light"] .CodeMirror{background:#ffffff !important;color:#000000 !important;height:100% !important;font-family:'Fira Code','Cascadia Code','Consolas',monospace !important;font-size:13.5px !important;line-height:22px !important;}
+/* NOTE: font-size/line-height here now read from the same --code-font-size /
+   --code-line-height variables set on #cm-host above, instead of being
+   hard-coded to 13.5px/22px. Two different rules independently hard-coding
+   the same value was exactly what let the zoom script's per-node inline
+   styles (the old, buggy approach) get out of sync with the rest of the
+   editor in the first place — now there's one source of truth. */
+[data-theme="dark"] .CodeMirror{background:#1e1e1e !important;color:#d4d4d4 !important;height:100% !important;font-family:'Fira Code','Cascadia Code','Consolas',monospace !important;font-size:var(--code-font-size,13.5px) !important;line-height:var(--code-line-height,22px) !important;}
+[data-theme="light"] .CodeMirror{background:#ffffff !important;color:#000000 !important;height:100% !important;font-family:'Fira Code','Cascadia Code','Consolas',monospace !important;font-size:var(--code-font-size,13.5px) !important;line-height:var(--code-line-height,22px) !important;}
 .CodeMirror-scroll{overflow:auto !important;}
 [data-theme="dark"] .CodeMirror-gutters{background:#1e1e1e !important;border-right:1px solid #2a2a2a !important;}
 [data-theme="light"] .CodeMirror-gutters{background:#f8f8f8 !important;border-right:1px solid #e0e0e0 !important;}
