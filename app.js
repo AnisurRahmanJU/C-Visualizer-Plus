@@ -3549,13 +3549,30 @@ cmEditor.setSize('100%', '100%');
 const cmWrapperEl = cmEditor.getWrapperElement();
 cmWrapperEl.style.webkitUserSelect = 'text';
 cmWrapperEl.style.userSelect = 'text';
+function extractCoords(evt) {
+  if (!evt) return null;
+  // touchend: the lifted finger lives in `changedTouches`, never in
+  // `touches` (that list only ever holds *still-active* touches, so on
+  // touchend it's always empty). Reading evt.touches[0] here — as the
+  // previous version of this function did — is always undefined, and
+  // TouchEvent itself has no clientX/clientY of its own (those only exist
+  // on MouseEvent/PointerEvent and on individual Touch objects), so the
+  // old code silently fell through to {left: undefined, top: undefined}
+  // on every single tap. CodeMirror's coordsChar() doesn't throw on that;
+  // it just resolves to the very start of the document, so every tap
+  // silently reset the cursor to line 0/ch 0 before typing began.
+  const touch = (evt.changedTouches && evt.changedTouches[0]) || (evt.touches && evt.touches[0]);
+  if (touch) return { left: touch.clientX, top: touch.clientY };
+  if (typeof evt.clientX === 'number' && typeof evt.clientY === 'number') {
+    return { left: evt.clientX, top: evt.clientY };
+  }
+  return null;
+}
 function ensureEditorFocused(evt) {
+  const coords = extractCoords(evt);
   if (cmEditor.hasFocus()) return;
-  const coords = (evt && evt.touches && evt.touches[0])
-    ? { left: evt.touches[0].clientX, top: evt.touches[0].clientY }
-    : (evt ? { left: evt.clientX, top: evt.clientY } : null);
   cmEditor.focus();
-  if (coords) {
+  if (coords && Number.isFinite(coords.left) && Number.isFinite(coords.top)) {
     try {
       const pos = cmEditor.coordsChar(coords, 'window');
       if (pos) cmEditor.setCursor(pos);
