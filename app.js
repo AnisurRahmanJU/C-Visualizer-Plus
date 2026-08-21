@@ -229,6 +229,16 @@ for_loop:`#include <stdio.h>
 int main() 
 {
     int i;
+    for (i = 1; i <= 10; i++) 
+    {
+        printf("%d\\n", i);
+    }
+    return 0;
+}`,
+nested_for_loop:`#include <stdio.h>
+int main() 
+{
+    int i;
     int j;
     int n;
     printf("Enter a number: ");
