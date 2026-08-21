@@ -3495,9 +3495,7 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 });
 
 // ── Mobile-friendly detection ────────────────────────────────────────────────
-// Used below to switch CodeMirror's input handling strategy on touch
-// devices, where the plain hidden-textarea input model frequently fails to
-// bring up the on-screen keyboard or accept typed characters reliably.
+// Used below to make focus/keyboard handling more robust on touch devices.
 const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
 
 const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), {
@@ -3510,20 +3508,17 @@ const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), 
   indentUnit: 4,
   tabSize: 4,
   indentWithTabs: false,
-  // FIX (mobile typing): CodeMirror 5 defaults to inputStyle:'textarea', a
-  // hidden, off-screen <textarea> that CodeMirror manually keeps focused
-  // and re-positions under the caret. Many mobile browsers (iOS Safari,
-  // Chrome for Android) only reliably show the on-screen keyboard and
-  // deliver keystrokes/autocomplete/IME composition when the focused
-  // element is a normal in-flow, visible editable element — the hidden
-  // off-screen textarea trick that works fine with a physical keyboard on
-  // desktop is exactly the pattern mobile browsers are least reliable
-  // with. Switching to 'contenteditable' makes CodeMirror render its own
-  // hidden input as a real contenteditable region instead, which mobile
-  // WebKit/Blink handle correctly for focus + the virtual keyboard. We
-  // only do this on touch devices so desktop keeps the (slightly faster)
-  // textarea input model.
-  inputStyle: isTouchDevice ? 'contenteditable' : 'textarea',
+  // NOTE (mobile typing): a previous version of this file forced
+  // inputStyle:'contenteditable' on touch devices to try to make the
+  // on-screen keyboard pop up more reliably. CodeMirror 5's own docs flag
+  // 'contenteditable' as still having "a lot of bugs" — and in practice
+  // that's what broke typing on mobile: keystrokes/composition events get
+  // lost or misplaced, especially once ghost-text widgets are inserted
+  // near the cursor (see c_autocom.js). The default 'textarea' input
+  // style is the well-tested path and reliably accepts typed characters
+  // on iOS Safari and Chrome/Android, so we keep it on every device and
+  // fix mobile focus/keyboard behavior separately below instead.
+  inputStyle: 'textarea',
   extraKeys: {
     'Tab': cm => cm.execCommand('indentMore'),
     'Shift-Tab': cm => cm.execCommand('indentLess'),
@@ -3537,6 +3532,21 @@ const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), 
 cmEditor.setValue(SAMPLES.memory_layout);
 cmEditor.setSize('100%', '100%');
 
+// FIX (mobile typing): CodeMirror's hidden input textarea inherits the
+// browser's default autocapitalize/autocorrect/spellcheck behavior, which
+// on mobile keyboards can mangle C code (capitalizing keywords, silently
+// "correcting" identifiers) and on some Android keyboards can even swallow
+// keystrokes while it tries to build a suggestion. Turn all of that off on
+// the actual input element CodeMirror uses.
+(function hardenMobileInputField() {
+  const field = cmEditor.getInputField();
+  if (!field) return;
+  field.setAttribute('autocapitalize', 'off');
+  field.setAttribute('autocorrect', 'off');
+  field.setAttribute('autocomplete', 'off');
+  field.setAttribute('spellcheck', 'false');
+})();
+
 // FIX (mobile typing): make sure a tap anywhere inside the editor actually
 // focuses CodeMirror and opens the virtual keyboard. On some mobile
 // browsers a tap that lands on the code area but not exactly on the
@@ -3545,38 +3555,40 @@ cmEditor.setSize('100%', '100%');
 // after the keyboard has been dismissed. This listener is a light,
 // harmless safety net: if the editor isn't already focused when the user
 // taps/clicks it, explicitly focus it (and place the cursor at the tapped
-// location when possible).
+// location when possible). On touch devices we defer the focus call by a
+// tick and focus the underlying <textarea> directly — some mobile browsers
+// only reliably raise the on-screen keyboard when focus() is called on the
+// real input element rather than proxied synchronously out of a touch
+// handler.
 const cmWrapperEl = cmEditor.getWrapperElement();
 cmWrapperEl.style.webkitUserSelect = 'text';
 cmWrapperEl.style.userSelect = 'text';
-function extractCoords(evt) {
-  if (!evt) return null;
-  // touchend: the lifted finger lives in `changedTouches`, never in
-  // `touches` (that list only ever holds *still-active* touches, so on
-  // touchend it's always empty). Reading evt.touches[0] here — as the
-  // previous version of this function did — is always undefined, and
-  // TouchEvent itself has no clientX/clientY of its own (those only exist
-  // on MouseEvent/PointerEvent and on individual Touch objects), so the
-  // old code silently fell through to {left: undefined, top: undefined}
-  // on every single tap. CodeMirror's coordsChar() doesn't throw on that;
-  // it just resolves to the very start of the document, so every tap
-  // silently reset the cursor to line 0/ch 0 before typing began.
-  const touch = (evt.changedTouches && evt.changedTouches[0]) || (evt.touches && evt.touches[0]);
-  if (touch) return { left: touch.clientX, top: touch.clientY };
-  if (typeof evt.clientX === 'number' && typeof evt.clientY === 'number') {
-    return { left: evt.clientX, top: evt.clientY };
-  }
-  return null;
-}
 function ensureEditorFocused(evt) {
-  const coords = extractCoords(evt);
   if (cmEditor.hasFocus()) return;
-  cmEditor.focus();
-  if (coords && Number.isFinite(coords.left) && Number.isFinite(coords.top)) {
-    try {
-      const pos = cmEditor.coordsChar(coords, 'window');
-      if (pos) cmEditor.setCursor(pos);
-    } catch (e) { /* ignore — focus() alone is enough */ }
+  const coords = (evt && evt.touches && evt.touches[0])
+    ? { left: evt.touches[0].clientX, top: evt.touches[0].clientY }
+    : (evt ? { left: evt.clientX, top: evt.clientY } : null);
+
+  function doFocus() {
+    cmEditor.focus();
+    const field = cmEditor.getInputField();
+    if (field && typeof field.focus === 'function') field.focus();
+    if (coords) {
+      try {
+        const pos = cmEditor.coordsChar(coords, 'window');
+        if (pos) cmEditor.setCursor(pos);
+      } catch (e) { /* ignore — focus() alone is enough */ }
+    }
+  }
+
+  if (isTouchDevice) {
+    // Give the browser a moment to finish handling the touch gesture
+    // before stealing focus — calling focus() synchronously inside a
+    // touchend handler is unreliable for raising the keyboard on some
+    // Android/iOS browser versions.
+    setTimeout(doFocus, 0);
+  } else {
+    doFocus();
   }
 }
 cmWrapperEl.addEventListener('touchend', ensureEditorFocused, { passive: true });
