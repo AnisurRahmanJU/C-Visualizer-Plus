@@ -2050,6 +2050,7 @@ class CInterpreter {
   }
 
   _parseTopLevel(){
+    const declLn=this._pk().ln;
     const type=this._parseType();const name=this._nx().v;
     if(this._pk().v==='('){
       this._ex('(');const params=[];
@@ -2069,6 +2070,19 @@ class CInterpreter {
       for(const p of params) {
         if(!p.isVariadic) this._functionScopes[name].add(p.name);
       }
+      // FIX (function-local redefinition): local `int a; int a;` duplicates
+      // used to only be caught by `_checkRedeclaration`, which runs from
+      // `_execDecl` — i.e. only while a function's body is actually being
+      // *executed*. A function that's defined but never called (like a
+      // `need()` nobody calls from `main()`) has dead code from the
+      // interpreter's point of view, so its declarations were never
+      // checked and no error ever appeared, even though real C code with
+      // duplicate locals fails to compile regardless of whether the
+      // function is ever invoked. Statically walk the freshly-parsed body
+      // right here, at parse time, so every function's declarations are
+      // checked unconditionally — matching real compiler behavior — before
+      // the program is ever run.
+      this._staticCheckFnBody(body);
     } else {
       let isArr=false,sz=null;
       if(this._pk().v==='['){this._nx();isArr=true;if(this._pk().v!==']')sz=this._parseExpr();this._ex(']');}
@@ -2081,10 +2095,29 @@ class CInterpreter {
         decls.push({name:nm2,isArr:ia2,arrSize:sz2,init:init2});
       }
       this._ex(';');
+      // FIX (global redefinition): this used to check
+      // `this._globalFrame.vars[d.name]`, but `_globalFrame.vars` is only
+      // populated later by `_initGlobals()` — at parse time it's always
+      // empty, so this check never fired and `this.globals[d.name]=...`
+      // below just silently overwrote each earlier global with the same
+      // name (last declaration wins, no error at all). Track declared
+      // global names/types ourselves as we parse them, in a plain map that
+      // exists for the lifetime of parsing, and reuse the same GCC-style
+      // two-part "redefinition ... / note: previous definition is here"
+      // error used for local-variable redeclaration inside functions.
+      this._globalDeclTypes = this._globalDeclTypes || {};
       for(const d of decls) {
-        if (this._globalFrame.vars[d.name] !== undefined) {
-          throw new Error(`error: redefinition of '${d.name}' (line ${this._pk().ln})`);
+        let typeStr = type;
+        if (d.isArr) {
+          const szStr = (d.arrSize && d.arrSize.type === 'lit') ? String(d.arrSize.v) : '';
+          typeStr += ` [${szStr}]`;
         }
+        const prev = this._globalDeclTypes[d.name];
+        if (prev) {
+          const sameType = prev.type === typeStr;
+          throw this._buildRedefError({ln: declLn}, d, prev, typeStr, sameType);
+        }
+        this._globalDeclTypes[d.name] = { type: typeStr, line: declLn };
         this.globals[d.name]={type,name:d.name,init:d.init,isArr:d.isArr,arrSize:d.arrSize};
         this._declaredVars.add(d.name);
       }
@@ -2467,8 +2500,7 @@ class CInterpreter {
 
   _checkRedeclaration(s, d, frame) {
     if (!frame) return;
-    frame._declTypes = frame._declTypes || {};
-    const typeStr = this._declTypeStr(s, d, frame);
+    frame._declTypes = frame._declTypes || {};    const typeStr = this._declTypeStr(s, d, frame);
     const scope = frame._scopeStack && frame._scopeStack.length
       ? frame._scopeStack[frame._scopeStack.length - 1]
       : null;
@@ -2495,6 +2527,118 @@ class CInterpreter {
     const record = { type: typeStr, line: s.ln };
     scope.own.set(d.name, record);
     frame._declTypes[d.name] = record;
+  }
+
+  // ── Static (compile-time) redeclaration check for function bodies ────────
+  // Mirrors `_checkRedeclaration`'s same-block-vs-sibling-scope logic above,
+  // but walks the parsed AST directly instead of live execution frames, so
+  // it runs once at parse time for every function — whether or not that
+  // function ever actually gets called at runtime. Only scalar/array type
+  // strings are needed here (no expression evaluation is possible yet,
+  // since nothing has run), which is enough to reproduce GCC-style
+  // same-type vs different-type redefinition messages.
+  _staticDeclTypeStr(varType, d) {
+    let t = varType;
+    if (d.isArr) {
+      const szStr = (d.arrSize && d.arrSize.type === 'lit') ? String(d.arrSize.v) : '';
+      t += ` [${szStr}]`;
+    }
+    return t;
+  }
+
+  _staticNewScope() { return { own: new Map(), outerSaved: new Map() }; }
+
+  _staticPopScope(scopeStack, declTypes) {
+    const scope = scopeStack.pop();
+    for (const nm of scope.own.keys()) {
+      if (scope.outerSaved.has(nm)) {
+        const outer = scope.outerSaved.get(nm);
+        if (outer === undefined) delete declTypes[nm];
+        else declTypes[nm] = outer;
+      } else {
+        delete declTypes[nm];
+      }
+    }
+  }
+
+  _staticCheckDecl(s, d, declTypes, scopeStack) {
+    const typeStr = this._staticDeclTypeStr(s.varType, d);
+    const line = d.line || s.ln;
+    const scope = scopeStack.length ? scopeStack[scopeStack.length - 1] : null;
+
+    if (!scope) {
+      const prev = declTypes[d.name];
+      if (prev) {
+        const sameType = prev.type === typeStr;
+        throw this._buildRedefError({ ln: line }, d, prev, typeStr, sameType);
+      }
+      declTypes[d.name] = { type: typeStr, line };
+      return;
+    }
+
+    const ownPrev = scope.own.get(d.name);
+    if (ownPrev) {
+      const sameType = ownPrev.type === typeStr;
+      throw this._buildRedefError({ ln: line }, d, ownPrev, typeStr, sameType);
+    }
+    if (!scope.outerSaved.has(d.name)) {
+      scope.outerSaved.set(d.name, declTypes[d.name]);
+    }
+    const record = { type: typeStr, line };
+    scope.own.set(d.name, record);
+    declTypes[d.name] = record;
+  }
+
+  _staticWalkStmts(stmts, declTypes, scopeStack) {
+    for (const s of stmts) { if (s) this._staticWalkStmt(s, declTypes, scopeStack); }
+  }
+
+  _staticWalkStmt(s, declTypes, scopeStack) {
+    switch (s.type) {
+      case 'block':
+        scopeStack.push(this._staticNewScope());
+        try { this._staticWalkStmts(s.body, declTypes, scopeStack); }
+        finally { this._staticPopScope(scopeStack, declTypes); }
+        break;
+      case 'decl':
+        for (const d of s.decls) this._staticCheckDecl(s, d, declTypes, scopeStack);
+        break;
+      case 'if':
+        this._staticWalkStmt(s.then, declTypes, scopeStack);
+        if (s.else) this._staticWalkStmt(s.else, declTypes, scopeStack);
+        break;
+      case 'while':
+        this._staticWalkStmt(s.body, declTypes, scopeStack);
+        break;
+      case 'do':
+        this._staticWalkStmt(s.body, declTypes, scopeStack);
+        break;
+      case 'for':
+        scopeStack.push(this._staticNewScope());
+        try {
+          if (s.init && s.init.type === 'decl') {
+            for (const d of s.init.decls) this._staticCheckDecl(s.init, d, declTypes, scopeStack);
+          }
+          this._staticWalkStmt(s.body, declTypes, scopeStack);
+        } finally {
+          this._staticPopScope(scopeStack, declTypes);
+        }
+        break;
+      case 'switch':
+        scopeStack.push(this._staticNewScope());
+        try {
+          for (const c of s.cases) this._staticWalkStmts(c.body, declTypes, scopeStack);
+        } finally {
+          this._staticPopScope(scopeStack, declTypes);
+        }
+        break;
+      default:
+        break; // return / break / continue / expr — no nested declarations
+    }
+  }
+
+  _staticCheckFnBody(body) {
+    this._staticWalkStmts(body, {}, []);
   }
 
   _validateExprVariables(node, frame) {
