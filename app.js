@@ -1946,14 +1946,6 @@ class CInterpreter {
     this._vaListCallArgs = [];
     this._declaredVars = new Set();
     this._functionScopes = {};
-    // Tracks how many times each function has been entered (by name), so
-    // that exponential/naive recursion (e.g. a textbook recursive Fibonacci
-    // `fib(n) = fib(n-1) + fib(n-2)` with no memoization) is caught early
-    // instead of silently running to the global step cap. Linear recursion
-    // (factorial, gcd, single-branch tree walks, etc.) stays comfortably
-    // under this limit for any input a learner would realistically try.
-    this._fnCallCounts = {};
-    this._MAX_CALLS_PER_FN = 60;
     try { this._tokenize(); this._buildAST(); this._initGlobals(); this._run(); }
     catch(e) { this.errors.push(e.message || String(e)); }
   }
@@ -2545,16 +2537,6 @@ class CInterpreter {
   _callFn(name,args,callSite){
     const fn=this.functions[name];
     if(!fn)throw new Error('Undefined function: '+name+(callSite?.ln?(' (line '+callSite.ln+')'):''));
-
-    this._fnCallCounts[name] = (this._fnCallCounts[name] || 0) + 1;
-    if (this._fnCallCounts[name] > this._MAX_CALLS_PER_FN) {
-      throw new Error(
-        `Stopped: '${name}()' was called more than ${this._MAX_CALLS_PER_FN} times. ` +
-        `This usually means naive exponential recursion (e.g. a recursive Fibonacci ` +
-        `without memoization). Try a smaller input, or rewrite '${name}' iteratively ` +
-        `or with memoization.`
-      );
-    }
 
     const frame={name,vars:{},retVal:undefined,_variadicArgs:[]};
     const isVariadic=fn.params.some(p=>p.isVariadic);
@@ -3474,7 +3456,11 @@ class CInterpreter {
   }
   _deepCopy(v){ if(Array.isArray(v)) return v.map(x=>this._deepCopy(x)); if(v&&typeof v==='object') return {...v}; return v; }
   _snapHeap(){const h={};for(const[k,v]of Object.entries(this._heap))h[k]={size:v.size,data:{...v.data},arr:v.arr?v.arr.slice():[],isChar:!!v.isChar,init:v.init?v.init.slice():[]};return h;}
-  _addStep(s){if(this.steps.length<800)this.steps.push(s);}
+  // Raised from 800 -> 5000 so that naive/exponential recursion (e.g. an
+  // un-memoized recursive Fibonacci) can still be stepped through in full
+  // for the input sizes a learner would realistically try, instead of the
+  // trace silently stopping partway through.
+  _addStep(s){if(this.steps.length<5000)this.steps.push(s);}
 }
 
 // ─── UI ──────────────────────────────────────────────────────────────────────
