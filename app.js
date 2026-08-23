@@ -517,11 +517,11 @@ int fib(int n) {
 int main() {
     for (int i = 0; i <= 10; i++) {
         if (i == 0) {
-            printf("fibo(0) = 0\\n");
+            printf("fib(0) = 0\\n");
         } else if (i == 1) {
-            printf("fibo(1) = 1\\n");
+            printf("fib(1) = 1\\n");
         } else {
-            printf("fibo(%d) = fibo(%d) + fibo(%d) = %d\\n", i, i - 1, i - 2, fib(i));
+            printf("fib(%d) = fib(%d) + fib(%d) = %d\\n", i, i - 1, i - 2, fib(i));
         }
     }
     return 0;
