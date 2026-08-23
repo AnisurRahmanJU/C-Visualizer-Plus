@@ -515,14 +515,8 @@ int fib(int n) {
 }
 
 int main() {
-    for (int i = 0; i <= 5; i++) {
-        if (i == 0) {
-            printf("fib(0) = 0\\n");
-        } else if (i == 1) {
-            printf("fib(1) = 1\\n");
-        } else {
-            printf("fib(%d) = fib(%d) + fib(%d) = %d\\n", i, i - 1, i - 2, fib(i));
-        }
+    for (int i = 0; i < 5; i++) {
+        printf("%d\\n", fib(i));
     }
     return 0;
 }`,
@@ -1964,15 +1958,6 @@ class CInterpreter {
     this._vaListCallArgs = [];
     this._declaredVars = new Set();
     this._functionScopes = {};
-    // FIX (global variable assignment): statements written at file scope
-    // outside of any function — e.g. `int a; a = 10;` where the assignment
-    // line sits *after* main() to itself in the source, not inside a
-    // function body — used to be silently discarded by _buildAST (see the
-    // fix there), which made a subsequent read of that global look like
-    // "the assignment never happened". Any such top-level statements are
-    // collected here during parsing and executed once, against the global
-    // frame, right before main() runs.
-    this._globalStmts = [];
     try { this._tokenize(); this._buildAST(); this._initGlobals(); this._run(); }
     catch(e) { this.errors.push(e.message || String(e)); }
   }
@@ -2018,41 +2003,6 @@ class CInterpreter {
       if(t.v==='struct'&&this._pk(2).v==='{'){this._parseStructDef();continue;}
       if(t.v==='typedef'){this._parseTypedef();continue;}
       if(this._isType(t.v)||t.v==='*'){this._parseTopLevel();continue;}
-      // FIX (global variable assignment): a statement written at file scope
-      // outside of any function — most commonly a plain assignment to an
-      // already-declared global, e.g.
-      //   int a;
-      //   a = 10;
-      //   int main() { printf("%d", a); }
-      // — used to fall through to the generic `this._nx()` below, which
-      // just discards ONE token per loop iteration. That silently ate the
-      // whole `a = 10;` statement (id, '=', literal, ';' each skipped one
-      // at a time) so the assignment never actually ran and `a` stayed at
-      // its default value — it looked like "global assignment doesn't
-      // work" even though the declaration alone worked fine.
-      //
-      // Real C doesn't allow bare statements at file scope either, but
-      // this tool is a teaching visualizer, not a strict compiler, and
-      // several of the bundled samples already lean on lenient parsing.
-      // So: when we hit an identifier at top level (not a type, so not a
-      // declaration/function), try to parse it as a normal statement and
-      // queue it to run once, right before main() is called, against the
-      // global frame — see _run(). If it doesn't parse as a statement
-      // (unexpected syntax), fall back to the old one-token-skip so we
-      // never get stuck in an infinite loop.
-      if(t.t==='id'){
-        const save=this._ti;
-        try {
-          const st=this._parseStmt();
-          if(this._ti===save){ this._nx(); continue; } // safety: force progress
-          if(st) this._globalStmts.push(st);
-          continue;
-        } catch(e) {
-          this._ti=save;
-          this._nx();
-          continue;
-        }
-      }
       this._nx();
     }
   }
@@ -2735,19 +2685,6 @@ class CInterpreter {
 
   _run(){
     this._addStep({ln:1,desc:'Program starts &rarr; calling <b>main()</b>',frames:[],heap:{},out:'',cs:[]});
-    // FIX (global variable assignment): run any statements that were
-    // written at file scope, outside of every function (see _buildAST),
-    // before main() starts — e.g. `int a; a = 10;` followed later by
-    // `int main() { printf("%d", a); }`. They execute directly against
-    // the global frame (callStack is empty at this point, so `_lval`'s
-    // id-lookup falls straight through to `this._globalFrame.vars`),
-    // which is exactly the "global initialization" behavior a person
-    // writing that pattern would expect.
-    if(this._globalStmts && this._globalStmts.length){
-      this._addStep({ln:this._globalStmts[0].ln||1,desc:'Running top-level statements on global variables before <b>main()</b>',frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:[]});
-      try { this._execBlock(this._globalStmts, this._globalFrame); }
-      catch(e){ if(!e || !e.type){ throw e; } }
-    }
     if(!this.functions['main']){this.errors.push('No main() function found.');return;}
     this._callFn('main',[],null);
     this._addStep({ln:1,desc:'<b>Program finished executing.</b>',frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
@@ -3173,13 +3110,7 @@ class CInterpreter {
       }
       if(this._globalFrame.vars[n]!==undefined){
         const gf=this._globalFrame;
-        // FIX (BSS -> Data on write): a global declared with no initializer
-        // (`int a;`) starts life in the BSS segment (seg:'bss', set by
-        // _initGlobals). Once code actually WRITES a value into it — e.g.
-        // `a = 10;` — it's no longer just reserved zeroed space, so the
-        // segment badge should reflect that and move to Data, matching how
-        // the visualizer treats `int a = 10;` (seg:'data') from the start.
-        return{get:()=>gf.vars[n].value,set:v=>{gf.vars[n].value=v;gf.vars[n].changed=true;if(gf.vars[n].seg==='bss')gf.vars[n].seg='data';}};
+        return{get:()=>gf.vars[n].value,set:v=>{gf.vars[n].value=v;gf.vars[n].changed=true;}};
       }
       const cf=frame||this._callStack[this._callStack.length-1];
       if(cf){cf.vars[n]={type:'int',value:0,addr:this._nextAddr()};return{get:()=>cf.vars[n].value,set:v=>{cf.vars[n].value=v;}};}
@@ -3439,15 +3370,7 @@ class CInterpreter {
     for (const f of [...this._callStack, this._globalFrame]) {
       if (!f) continue;
       for (const [k, v] of Object.entries(f.vars)) {
-        if (v.addr === addr) {
-          v.value = value; v.changed = true;
-          // FIX (BSS -> Data on write): same rule as the _lval id-branch —
-          // writing through a pointer or via scanf(&global, ...) into a
-          // global that started in BSS (uninitialized) means it now holds
-          // real content, so flip its segment badge to Data too.
-          if (f === this._globalFrame && v.seg === 'bss') v.seg = 'data';
-          return true;
-        }
+        if (v.addr === addr) { v.value = value; v.changed = true; return true; }
       }
     }
     return false;
