@@ -515,7 +515,7 @@ int fib(int n) {
 }
 
 int main() {
-    for (int i = 0; i <= 10; i++) {
+    for (int i = 0; i <= 5; i++) {
         if (i == 0) {
             printf("fib(0) = 0\\n");
         } else if (i == 1) {
