@@ -513,10 +513,15 @@ int fib(int n) {
     if (n == 1) return 1;
     return fib(n - 1) + fib(n - 2);
 }
-
 int main() {
-    for (int i = 0; i < 5; i++) {
-        printf("%d\\n", fib(i));
+    for (int i = 0; i <= 5; i++) {
+        if (i == 0) {
+            printf("fib(0) = 0\\n");
+        } else if (i == 1) {
+            printf("fib(1) = 1\\n");
+        } else {
+         printf("fib(%d) = fib(%d) + fib(%d) = %d\\n", i, i - 1, i - 2, fib(i));
+        }
     }
     return 0;
 }`,
