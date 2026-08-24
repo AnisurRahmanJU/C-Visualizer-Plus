@@ -2868,8 +2868,21 @@ class CInterpreter {
       const nm=this._exprName(e.l);
       this._addStep({ln:s.ln,desc:`Assign <code>${nm}</code> ${e.op} &rarr; <b>${this._fv(v)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:nm});
     } else if(e.type==='post'||e.type==='pre'){
+      // NOTE: `v` is the RESULT of evaluating the whole ++/-- expression,
+      // not necessarily the variable's final stored value: post-increment
+      // (`j++`) evaluates to the OLD value even though it also updates the
+      // variable, while pre-increment (`++j`) evaluates to the NEW value.
+      // Using `v` directly here for BOTH cases used to make the step
+      // description for a post-increment/decrement say "now <old value>",
+      // which visibly disagreed with the Variables panel (which always
+      // shows the variable's真 current/updated value from the snapshot
+      // taken after the operation completed). Re-read the target variable
+      // itself (now that the increment/decrement has already been applied)
+      // so the description always reports the actual, current value —
+      // matching what the Variables panel shows.
       const nm=this._exprName(e.x);
-      this._addStep({ln:s.ln,desc:`<code>${nm}${e.op}</code> &rarr; now <b>${this._fv(v)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:nm});
+      const nowVal=this._eval(e.x,frame);
+      this._addStep({ln:s.ln,desc:`<code>${nm}${e.op}</code> &rarr; now <b>${this._fv(nowVal)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:nm});
     }
   }
   _exprName(e){ if(!e)return'?'; if(e.type==='id')return e.n; if(e.type==='sub')return this._exprName(e.x); if(e.type==='mem')return this._exprName(e.x); if(e.type==='deref')return this._exprName(e.x); return '?'; }
@@ -2944,11 +2957,26 @@ class CInterpreter {
         try{this._execStmt(s.body,frame);}catch(e){if(e.type==='break')break;if(e.type!=='cont')throw e;}
         if(s.update){
           this._validateExprVariables(s.update, frame);
-          const v=this._eval(s.update,frame);
+          this._eval(s.update,frame);
+          // FIX: `_eval(s.update, frame)` returns the RESULT of evaluating
+          // the update expression, which for a post-increment/decrement
+          // (`j++` / `j--`) is the value BEFORE the change (post-inc/dec
+          // evaluate to the old value in C, even though they still perform
+          // the update). The description previously displayed that raw
+          // return value directly as "now <value>", so for `j++` it showed
+          // the OLD value (e.g. "now 2") right as the Variables panel
+          // (snapshotted immediately after, via `_snapFrames()`) already
+          // reflects the truly updated value (e.g. 3) — a visible mismatch
+          // like the one reported. Re-reading the target variable itself
+          // after the update has been applied guarantees the description
+          // always matches what the Variables panel shows, regardless of
+          // whether the update was post-inc/dec, pre-inc/dec, or a plain
+          // assignment/compound-assignment.
           const targetNode = (s.update.type==='post'||s.update.type==='pre') ? s.update.x
                             : (s.update.type==='bin' ? s.update.l : s.update);
           const nm=this._exprName(targetNode);
-          this._addStep({ln:s.ln,part:'for-update',desc:`<b>for-update:</b> <code>${nm}</code> &rarr; now <b>${this._fv(v)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:nm});
+          const nowVal=this._eval(targetNode,frame);
+          this._addStep({ln:s.ln,part:'for-update',desc:`<b>for-update:</b> <code>${nm}</code> &rarr; now <b>${this._fv(nowVal)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:nm});
         }
       }
     } finally {
@@ -3907,6 +3935,7 @@ function highlightSegment(step) {
     cmEditor.scrollIntoView({ line: range.line, ch: range.chStart }, 80);
   } catch(e) { /* line/ch out of range — silently skip */ }
 }
+
 
 // ── Element refs ─────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
