@@ -1,12 +1,5 @@
 'use strict';
 
-// c_code.js
-// Holds all sample C programs used by the C Visualizer Plus.
-// This file must be loaded BEFORE c_compiler.js, e.g.:
-//   <script src="c_code.js"></script>
-//   <script src="c_compiler.js"></script>
-// c_compiler.js references the top-level `SAMPLES` constant directly.
-
 const SAMPLES = {
 memory_layout:`#include <stdio.h>
 #include <stdlib.h>
