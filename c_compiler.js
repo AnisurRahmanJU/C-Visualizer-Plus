@@ -1,12 +1,5 @@
 'use strict';
 
-// c_compiler.js
-// The C interpreter engine + UI wiring for C Visualizer Plus.
-// Depends on the global `SAMPLES` constant defined in c_code.js.
-// Load order in HTML must be:
-//   <script src="c_code.js"></script>
-//   <script src="c_compiler.js"></script>
-
 // ─── Bit-width helpers ───────────────────────────────────────────────────────
 function bitWidthForType(type) {
   if (!type) return 32;
