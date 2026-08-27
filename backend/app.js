@@ -1604,6 +1604,10 @@ int main() {
 boolean:`#include <stdio.h>
 #include <string.h>
 
+typedef int bool;
+#define true 1
+#define false 0
+
 int main() {
     int correct;
     int condition1;
@@ -1611,6 +1615,8 @@ int main() {
     int mixed_logic;
     int x;
     int is_in_range;
+    bool flag1;
+    bool flag2;
     
     printf("%s\\n", (5 > 3) ? "true" : "false");
     printf("%s\\n", (10 == 15) ? "true" : "false");
@@ -1635,6 +1641,10 @@ int main() {
     x = 15;
     is_in_range = (x > 10) && (x < 20);
     printf("%s\\n", is_in_range ? "true" : "false");
+
+    flag1 = true;
+    flag2 = false;
+    printf("%s\\n", (flag1 && !flag2) ? "true" : "false");
 
     return 0;
 }`,
