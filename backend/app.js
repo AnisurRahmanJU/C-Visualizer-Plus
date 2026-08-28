@@ -196,17 +196,17 @@ int main() {
     // 2. Constant Type
     const double PI = 3.1416;
 
-    // 2. String & Array
+    // 3. String & Array
     char str[10] = "Anisur ";
     int matrix[3] = {10, 20, 30};
 
-    // 3. Pointer
+    // 4. Pointer
     int *ptr = &a;
 
-    // 4. Static
+    // 5. Static
     static int count = 1;
 
-    // 5. Structure instance
+    // 6. Structure instance
     struct Point pt = {15, 25};
 
     // Output Prints
@@ -215,6 +215,9 @@ int main() {
     printf("float b = %f\\n", b);
     printf("char c = %c\\n", c);
     printf("double d = %f\\n\\n", d);
+
+    printf("Constant Type:\\n");
+    printf("double PI = %f\\n\\n", PI);
 
     printf("Arrays & Strings:\\n");
     printf("string str = %s\\n", str);
