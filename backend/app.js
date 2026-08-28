@@ -190,6 +190,23 @@ int main() {
     printf("x = %d\\n", x);
     return 0;
 }`,
+
+const:`#include <stdio.h>
+
+int main() {
+    const double PI = 3.1415926535;
+    const double RADIUS = 5.0;
+    
+    const double AREA = PI * RADIUS * RADIUS;
+    const double CIRCUMFERENCE = 2.0 * PI * RADIUS;
+
+    printf("Radius: %.2f\\n", RADIUS);
+    printf("Area: %.4f\\n", AREA);
+    printf("Circumference: %.4f\\n", CIRCUMFERENCE);
+
+    return 0;
+}`,
+    
 arithmetic:`#include <stdio.h>
 
 int main() {
@@ -264,6 +281,19 @@ int main() {
         n++;
     }
     printf("Final: %d\\n", total);
+    return 0;
+}`,
+    
+do_while:`#include <stdio.h>
+
+int main() {
+    int count = 1;
+
+    do {
+        printf("Count is: %d\\n", count);
+        count++;
+    } while (count <= 5);
+
     return 0;
 }`,
 pattern:`#include <stdio.h>
