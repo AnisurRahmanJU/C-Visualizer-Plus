@@ -1808,6 +1808,45 @@ int main() {
     printf("sizeof(ptr own)    = %d bytes\\n", (int)sizeof(ptr)*2);
     return 0;
 }`,
+
+global_arrays_demo:`#include <stdio.h>
+
+int   g_int_arr[5]      = {1, 2, 3, 4, 5};
+char  g_char_arr[10]    = {'A', 'n', 'i', 's'};
+char  g_char_str[10]    = "Anisur";
+int   g_grid[2][3]      = {{1, 2, 3}, {4, 5, 6}};
+float g_float_arr[3]    = {1.5f, 2.5f, 3.5f};
+int   g_no_init[4];
+
+struct Point {
+    int x;
+    int y;
+};
+struct Point g_point = {7, 9};
+
+int main() {
+    int i, j;
+    printf("g_int_arr: ");
+    for (i = 0; i < 5; i++) printf("%d ", g_int_arr[i]);
+    printf("\\n");
+
+    printf("g_char_arr: ");
+    for (i = 0; i < 4; i++) printf("%c", g_char_arr[i]);
+    printf("\\n");
+
+    printf("g_char_str: %s\\n", g_char_str);
+
+    printf("g_grid:\\n");
+    for (i = 0; i < 2; i++) {
+        for (j = 0; j < 3; j++) printf("%d ", g_grid[i][j]);
+        printf("\\n");
+    }
+
+    printf("g_float_arr: %.1f %.1f %.1f\\n", g_float_arr[0], g_float_arr[1], g_float_arr[2]);
+    printf("g_no_init (BSS, zero-initialized): %d %d %d %d\\n", g_no_init[0], g_no_init[1], g_no_init[2], g_no_init[3]);
+    printf("g_point: (%d, %d)\\n", g_point.x, g_point.y);
+    return 0;
+}`,
 };
 
 // ─── Bit-width helpers ───────────────────────────────────────────────────────
@@ -2111,15 +2150,53 @@ class CInterpreter {
       // the program is ever run.
       this._staticCheckFnBody(body);
     } else {
-      let isArr=false,sz=null;
-      if(this._pk().v==='['){this._nx();isArr=true;if(this._pk().v!==']')sz=this._parseExpr();this._ex(']');}
-      let init=null;if(this._pk().v==='='){this._nx();init=this._parseExpr();}
-      const decls=[{name,isArr,arrSize:sz,init}];
+      // FIX (global array/struct initializers not visualizing): this used
+      // to call `this._parseExpr()` for a global initializer. `_parseExpr`
+      // bottoms out in `_parsePrim()`, whose handling of a bare `{` is:
+      //
+      //   if(t.v==='{'){
+      //     let depth=1; while(depth>0 ...) { ... } this._nx();
+      //     return {type:'lit', v:0, ln:t.ln};
+      //   }
+      //
+      // i.e. it just SKIPS the entire brace-enclosed initializer list and
+      // throws it away, returning the literal 0. That's why a global like
+      // `char g[10] = {'A','n','i','s'};` or `int g[5] = {1,2,3,4,5};`
+      // silently became `g = 0` — the initializer never became an
+      // `arrlit` AST node, so `_flattenInit()` in `_initGlobals()` never
+      // saw a real list to flatten. A plain string initializer
+      // (`char g[] = "Anisur";`) happened to work anyway because a string
+      // token is handled directly in `_parsePrim()` without ever hitting
+      // the `{` branch.
+      //
+      // Local declarations never had this problem because `_parseDecl()`
+      // already used `_parse2DInit()`, which recursively builds a proper
+      // `{type:'arrlit', items:[...]}` node (including nested braces for
+      // 2D arrays). Switching global initializer parsing to the same
+      // `_parse2DInit()` fixes every global initializer form — char
+      // arrays, int arrays, float arrays, 2D arrays, and struct literals —
+      // to match local-variable behavior exactly.
+      //
+      // We also now parse an optional second `[...]` dimension here
+      // (`arrSize2`), which previously wasn't recognized at all for
+      // globals, so that a global 2D array like
+      // `int g_grid[2][3] = {{1,2,3},{4,5,6}};` parses and visualizes
+      // correctly too (see the matching `_initGlobals()` fix below).
+      let isArr=false,sz=null,sz2=null;
+      if(this._pk().v==='['){
+        this._nx();isArr=true;if(this._pk().v!==']')sz=this._parseExpr();this._ex(']');
+        if(this._pk().v==='['){this._nx();if(this._pk().v!==']')sz2=this._parseExpr();this._ex(']');}
+      }
+      let init=null;if(this._pk().v==='='){this._nx();init=this._parse2DInit();}
+      const decls=[{name,isArr,arrSize:sz,arrSize2:sz2,init}];
       while(this._pk().v===','){
-        this._nx();const nm2=this._nx().v;let ia2=false,sz2=null,init2=null;
-        if(this._pk().v==='['){this._nx();ia2=true;if(this._pk().v!==']')sz2=this._parseExpr();this._ex(']');}
-        if(this._pk().v==='='){this._nx();init2=this._parseExpr();}
-        decls.push({name:nm2,isArr:ia2,arrSize:sz2,init:init2});
+        this._nx();const nm2=this._nx().v;let ia2=false,sz2b=null,sz2b2=null,init2=null;
+        if(this._pk().v==='['){
+          this._nx();ia2=true;if(this._pk().v!==']')sz2b=this._parseExpr();this._ex(']');
+          if(this._pk().v==='['){this._nx();if(this._pk().v!==']')sz2b2=this._parseExpr();this._ex(']');}
+        }
+        if(this._pk().v==='='){this._nx();init2=this._parse2DInit();}
+        decls.push({name:nm2,isArr:ia2,arrSize:sz2b,arrSize2:sz2b2,init:init2});
       }
       this._ex(';');
       // FIX (global redefinition): this used to check
@@ -2138,6 +2215,10 @@ class CInterpreter {
         if (d.isArr) {
           const szStr = (d.arrSize && d.arrSize.type === 'lit') ? String(d.arrSize.v) : '';
           typeStr += ` [${szStr}]`;
+          if (d.arrSize2) {
+            const szStr2 = (d.arrSize2.type === 'lit') ? String(d.arrSize2.v) : '';
+            typeStr += `[${szStr2}]`;
+          }
         }
         const prev = this._globalDeclTypes[d.name];
         if (prev) {
@@ -2145,7 +2226,7 @@ class CInterpreter {
           throw this._buildRedefError({ln: declLn}, d, prev, typeStr, sameType);
         }
         this._globalDeclTypes[d.name] = { type: typeStr, line: declLn };
-        this.globals[d.name]={type,name:d.name,init:d.init,isArr:d.isArr,arrSize:d.arrSize};
+        this.globals[d.name]={type,name:d.name,init:d.init,isArr:d.isArr,arrSize:d.arrSize,arrSize2:d.arrSize2};
         this._declaredVars.add(d.name);
       }
     }
@@ -2321,42 +2402,103 @@ class CInterpreter {
 }
 
   _initGlobals(){
+    // FIX (global array/struct initializers not visualizing): this
+    // previously handled only 1D arrays (via `_flattenInit`) and, for
+    // non-array globals, just did `this._eval(g.init, this._globalFrame)`
+    // for ANY initializer — including a struct brace-list like
+    // `struct Point g_point = {7, 9};`, whose `arrlit` node would get
+    // `_eval`'d into a plain JS array `[7, 9]` instead of an object keyed
+    // by the struct's field names (`{x:7, y:9}`), breaking any later
+    // `g_point.x` access. There was also no handling at all for a global
+    // 2D array (`arrSize2`), since that dimension wasn't even parsed
+    // before (see `_parseTopLevel` fix above).
+    //
+    // This rewrite mirrors `_execDecl()`'s logic for local variables:
+    //  - 1D arrays: flatten + pad/truncate to the declared size.
+    //  - 2D arrays: build each row from either a nested arrlit
+    //    (`{{1,2},{3,4}}`) or a flat list, matching local behavior.
+    //  - struct literals: walk the struct's field list in order and
+    //    assign each initializer item to the matching field name, so
+    //    `g_point.x` / `g_point.y` work exactly like a local struct.
+    //  - a struct with NO initializer still default-constructs its
+    //    fields (unchanged from before).
     for(const [name,g] of Object.entries(this.globals)){
       if(this._globalFrame.vars[name]) continue;
       let val;
       if(g.isArr){
-        if(g.init){
+        const sz=g.arrSize?this._eval(g.arrSize,this._globalFrame):0;
+        if(g.arrSize2){
+          const sz2=this._eval(g.arrSize2,this._globalFrame);
+          if(g.init){
+            const flat=this._flattenInit(g.init,this._globalFrame);
+            const isNested = flat.length>0 && Array.isArray(flat[0]);
+            const rows=[];
+            if(isNested){
+              for(let r=0;r<sz;r++){
+                const srcRow = flat[r]||[];
+                const row=srcRow.slice(0,sz2);
+                while(row.length<sz2) row.push(0);
+                rows.push(row);
+              }
+            } else {
+              if(flat.length>sz*sz2){
+                throw new Error(`initializer for array '${name}' has too many elements for size [${sz}][${sz2}]`);
+              }
+              for(let r=0;r<sz;r++){
+                const row=[];
+                for(let c=0;c<sz2;c++){
+                  const idx=r*sz2+c;
+                  row.push(idx<flat.length?flat[idx]:0);
+                }
+                rows.push(row);
+              }
+            }
+            val=rows;
+          } else {
+            val=Array.from({length:sz},()=>new Array(sz2).fill(0));
+          }
+        } else if(g.init){
           val=this._flattenInit(g.init,this._globalFrame);
           if(g.arrSize){
-            const declaredSz=this._eval(g.arrSize,this._globalFrame);
-            if(val.length>declaredSz){
-              throw new Error(`initializer-string for char array '${name}' is too long — increase your array size`);
+            if(val.length>sz){
+              throw new Error(`initializer-string for array '${name}' is too long — increase your array size`);
             }
-            while(val.length<declaredSz) val.push(0);
+            while(val.length<sz) val.push(0);
           }
         }
-        else val=[];
+        else val=new Array(sz).fill(0);
+      } else if (g.init && g.init.type === 'arrlit') {
+        const structName = g.type.replace(/^struct\s+/, '').trim();
+        const fields = this.structs[structName] || this.structs[g.type];
+        if (fields) {
+          const obj = {};
+          g.init.items.forEach((item, fi) => {
+            const f = fields[fi];
+            if (!f) return;
+            obj[f.name] = item.type === 'arrlit' ? this._flattenInit(item, this._globalFrame) : this._eval(item, this._globalFrame);
+          });
+          val = obj;
+        } else if (/^struct\b/.test(g.type)) {
+          throw new Error(`error: unknown type name 'struct ${structName}' — no 'struct ${structName} { ... };' was defined`);
+        } else {
+          // Not a known struct type but got a brace-list initializer
+          // (e.g. a scalar with a redundant `{...}` wrapper) — fall back
+          // to flattening and taking the first value, matching how a
+          // real compiler would treat a scalar's braced initializer.
+          const flat = this._flattenInit(g.init, this._globalFrame);
+          val = flat.length ? flat[0] : 0;
+        }
       } else if(g.init){
         val=this._eval(g.init,this._globalFrame);
       } else {
-        // FIX: a global `struct Foo bar;` with no initializer used to fall
-        // through to `val = 0`, leaving `bar` as a plain number instead of
-        // an object with fields. Any later `bar.field` (via '.', '->', or
-        // as a buffer target for strcpy/strcat) then silently failed
-        // because `_eval`'s 'mem' case does `obj[e.f]` on a number, which
-        // is always 0/undefined, and strcpy's `_resolveBuffer` can't
-        // resolve a number to an array either. Default-construct a struct
-        // object (with zeroed scalar fields and correctly-sized zero
-        // arrays for array fields) so member access and strcpy/strcat into
-        // char-array fields work exactly like a real uninitialized struct.
         const structName = g.type.replace(/^struct\s+/, '').trim();
         const fields = this.structs[structName] || this.structs[g.type];
         if (fields) {
           const obj = {};
           for (const f of fields) {
             if (f.isArr) {
-              const sz = f.sz ? this._eval(f.sz, this._globalFrame) : 0;
-              obj[f.name] = new Array(sz).fill(0);
+              const fsz = f.sz ? this._eval(f.sz, this._globalFrame) : 0;
+              obj[f.name] = new Array(fsz).fill(0);
             } else {
               obj[f.name] = 0;
             }
@@ -2396,10 +2538,11 @@ class CInterpreter {
     // the top-level initializer of a real array (`d.isArr` in _execDecl, or
     // `g.isArr` in _initGlobals). Struct literals such as
     // `struct Student s = {"Anisur", 25, 4.56};` are handled by a completely
-    // separate branch in _execDecl that walks `d.init.items` field-by-field
-    // and only recurses into _flattenInit for an individual field that is
-    // itself a nested `{...}` (e.g. an array-typed struct field, which really
-    // is homogeneous by C's type system). So this check never fires for
+    // separate branch (in _execDecl for locals and _initGlobals for globals)
+    // that walks `d.init.items` / `g.init.items` field-by-field and only
+    // recurses into _flattenInit for an individual field that is itself a
+    // nested `{...}` (e.g. an array-typed struct field, which really is
+    // homogeneous by C's type system). So this check never fires for
     // struct/union/enum initializers — only for actual arrays.
     if(!node || node.type!=='arrlit') return;
     let kind=null, kindLn=null;
