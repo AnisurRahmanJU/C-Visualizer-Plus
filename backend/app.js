@@ -2050,6 +2050,44 @@ class CInterpreter {
   _ex(v){const t=this._nx();if(t.v!==v)throw new Error(`Expected '${v}' got '${t.v}' near line ${t.ln}`);return t;}
   _isType(v){return['int','float','double','char','void','long','short','unsigned','struct','const','size_t','signed','va_list','FILE','bool'].includes(v);}
 
+  // ── Detects "id ( [subscript] | .field | ->field )* assignOp" starting at
+  // the current token, WITHOUT consuming any tokens (pure lookahead). Used
+  // by _buildAST() to catch a global-scope statement like:
+  //     int x;
+  //     x = 10;         // <-- declaration and assignment written separately
+  // Real C does not allow a bare assignment statement outside a function
+  // body (file-scope only allows declarations/definitions with an optional
+  // initializer), so when this pattern is seen at the top level we raise a
+  // dedicated, friendlier error instead of silently skipping the tokens
+  // (which is what happened before this fix — _buildAST's fallback branch
+  // just called `this._nx()` once per unrecognized token and moved on).
+  _peekIsGlobalAssignment(){
+    let i = this._ti;
+    const tok = this.tokens[i];
+    if(!tok || tok.t!=='id') return false;
+    i++;
+    while(true){
+      const t2 = this.tokens[i];
+      if(!t2) return false;
+      if(t2.v==='['){
+        let depth=1;i++;
+        while(i<this.tokens.length && depth>0){
+          if(this.tokens[i].v==='[')depth++;
+          else if(this.tokens[i].v===']')depth--;
+          i++;
+        }
+        continue;
+      }
+      if(t2.v==='.'||t2.v==='->'){
+        i+=2; continue;
+      }
+      break;
+    }
+    const opTok = this.tokens[i];
+    const assignOps=['=','+=','-=','*=','/=','%='];
+    return !!(opTok && assignOps.includes(opTok.v));
+  }
+
   _buildAST(){
     while(this._pk().t!=='eof'){
       const t=this._pk();
@@ -2057,6 +2095,15 @@ class CInterpreter {
       if(t.v==='struct'&&this._pk(2).v==='{'){this._parseStructDef();continue;}
       if(t.v==='typedef'){this._parseTypedef();continue;}
       if(this._isType(t.v)||t.v==='*'){this._parseTopLevel();continue;}
+      // FIX (global declaration/assignment separated): previously any
+      // unrecognized top-level token — including the start of a bare
+      // assignment statement like `x = 10;` written after `int x;` — was
+      // just skipped one token at a time via the fallback `this._nx()`
+      // below, so the assignment silently vanished instead of erroring.
+      // Detect that specific pattern here and surface a clear message.
+      if(t.t==='id' && this._peekIsGlobalAssignment()){
+        throw new Error('Invalid assignment in global scope, assign value with declaration(datatype)');
+      }
       this._nx();
     }
   }
