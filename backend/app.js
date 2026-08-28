@@ -177,17 +177,56 @@ int main() {
 }`,
 variables:`#include <stdio.h>
 
+// Global variable for the extern demo
+int global_gold = 500;
+
+// Simple Structure 
+struct Point {
+    int x;
+    int y;
+};
+
 int main() {
+    // 1. Basic Types
     int a = 10;
-    float b = 3.14;
+    float b = 3.14f;
     char c = 'A';
     double d = 2.71828;
-    int x;
-    x = a + 5;
+    
+    // 2. Constant Type
+    const double PI = 3.1416;
+
+    // 2. String & Array
+    char str[10] = "Anisur ";
+    int matrix[3] = {10, 20, 30};
+
+    // 3. Pointer
+    int *ptr = &a;
+
+    // 4. Static
+    static int count = 1;
+
+    // 5. Structure instance
+    struct Point pt = {15, 25};
+
+    // Output Prints
+    printf("Basic Types:\\n");
     printf("int a = %d\\n", a);
-    printf("float b = %.2f\\n", b);
+    printf("float b = %f\\n", b);
     printf("char c = %c\\n", c);
-    printf("x = %d\\n", x);
+    printf("double d = %f\\n\\n", d);
+
+    printf("Arrays & Strings:\\n");
+    printf("string str = %s\\n", str);
+    printf("array index 0 = %d\\n\\n", matrix[0]);
+
+    printf("Pointers:\\n");
+    printf("pointer value = %d\\n", *ptr);
+    printf("static count = %d\\n\\n", count);
+
+    printf("Structure:\\n");
+    printf("struct point = (%d, %d)\\n", pt.x, pt.y);
+
     return 0;
 }`,
 
