@@ -210,24 +210,26 @@ int main() {
     struct Point pt = {15, 25};
 
     // Output Prints
-    printf("Basic Types:\\n");
+    printf("1. Basic Types:\\n");
     printf("int a = %d\\n", a);
     printf("float b = %f\\n", b);
     printf("char c = %c\\n", c);
     printf("double d = %f\\n\\n", d);
 
-    printf("Constant Type:\\n");
+    printf("2. Constant Type:\\n");
     printf("double PI = %f\\n\\n", PI);
 
-    printf("Arrays & Strings:\\n");
+    printf("3. Arrays & Strings:\\n");
     printf("string str = %s\\n", str);
     printf("array index 0 = %d\\n\\n", matrix[0]);
 
-    printf("Pointers:\\n");
+    printf("4. Pointers:\\n");
     printf("pointer value = %d\\n", *ptr);
+    
+    printf("5. Static:\\n");
     printf("static count = %d\\n\\n", count);
 
-    printf("Structure:\\n");
+    printf("6. Structure:\\n");
     printf("struct point = (%d, %d)\\n", pt.x, pt.y);
 
     return 0;
