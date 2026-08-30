@@ -2006,12 +2006,6 @@ function toBinaryHtml(val, type) {
 }
 
 // ─── Struct field display helper ────────────────────────────────────────────
-// Converts a struct field's raw stored value into a readable display string.
-// Char-array fields (e.g. `char name[50]`) are stored internally as an array
-// of character codes, so without this they'd render as a raw comma-separated
-// number list. This detects "char-code-like" arrays (all values 0-255) and
-// renders them as a quoted, null-terminated string instead; other arrays
-// (e.g. int arrays) still render as a bracketed list.
 function fieldToDisplay(v2) {
   if (Array.isArray(v2)) {
     const isCharLike = v2.length > 0 && v2.every(x => typeof x === 'number' && x >= 0 && x <= 255);
@@ -2028,11 +2022,6 @@ function fieldToDisplay(v2) {
   return String(v2);
 }
 
-// Computes a display-friendly byte size for a variable entry {type, value},
-// mirroring the same level of approximation used elsewhere in the app
-// (e.g. the interpreter's own sizeof() support). Handles scalars, pointers,
-// 1D/2D arrays, and struct instances. Returns "1 Byte" / "N Bytes" style
-// text via formatBytes().
 function sizeOfDisplay(v) {
   const type = v.type || '';
   const val = v.value;
@@ -2048,7 +2037,6 @@ function sizeOfDisplay(v) {
     return formatBytes(val.length * elemBytes);
   }
   if (val && typeof val === 'object') {
-    // struct instance — approximate by summing field sizes
     let total = 0;
     for (const fv of Object.values(val)) {
       if (Array.isArray(fv)) {
@@ -2086,6 +2074,11 @@ class CInterpreter {
     this._vaListCallArgs = [];
     this._declaredVars = new Set();
     this._functionScopes = {};
+    // Records every array subscript read/write ({name, idx, op}) so the UI
+    // can highlight the exact cell(s) touched by a swap, comparison, or
+    // search match while stepping through the trace (see _recordTouch,
+    // and _addStep which snapshots + clears this into each step object).
+    this._touchLog = [];
     try { this._tokenize(); this._buildAST(); this._initGlobals(); this._run(); }
     catch(e) { this.errors.push(e.message || String(e)); }
   }
@@ -2124,17 +2117,6 @@ class CInterpreter {
   _ex(v){const t=this._nx();if(t.v!==v)throw new Error(`Expected '${v}' got '${t.v}' near line ${t.ln}`);return t;}
   _isType(v){return['int','float','double','char','void','long','short','unsigned','struct','const','size_t','signed','va_list','FILE','bool'].includes(v);}
 
-  // ── Detects "id ( [subscript] | .field | ->field )* assignOp" starting at
-  // the current token, WITHOUT consuming any tokens (pure lookahead). Used
-  // by _buildAST() to catch a global-scope statement like:
-  //     int x;
-  //     x = 10;         // <-- declaration and assignment written separately
-  // Real C does not allow a bare assignment statement outside a function
-  // body (file-scope only allows declarations/definitions with an optional
-  // initializer), so when this pattern is seen at the top level we raise a
-  // dedicated, friendlier error instead of silently skipping the tokens
-  // (which is what happened before this fix — _buildAST's fallback branch
-  // just called `this._nx()` once per unrecognized token and moved on).
   _peekIsGlobalAssignment(){
     let i = this._ti;
     const tok = this.tokens[i];
@@ -2169,12 +2151,6 @@ class CInterpreter {
       if(t.v==='struct'&&this._pk(2).v==='{'){this._parseStructDef();continue;}
       if(t.v==='typedef'){this._parseTypedef();continue;}
       if(this._isType(t.v)||t.v==='*'){this._parseTopLevel();continue;}
-      // FIX (global declaration/assignment separated): previously any
-      // unrecognized top-level token — including the start of a bare
-      // assignment statement like `x = 10;` written after `int x;` — was
-      // just skipped one token at a time via the fallback `this._nx()`
-      // below, so the assignment silently vanished instead of erroring.
-      // Detect that specific pattern here and surface a clear message.
       if(t.t==='id' && this._peekIsGlobalAssignment()){
         throw new Error('Invalid assignment in global scope, assign value with declaration(datatype)');
       }
@@ -2257,52 +2233,8 @@ class CInterpreter {
       for(const p of params) {
         if(!p.isVariadic) this._functionScopes[name].add(p.name);
       }
-      // FIX (function-local redefinition): local `int a; int a;` duplicates
-      // used to only be caught by `_checkRedeclaration`, which runs from
-      // `_execDecl` — i.e. only while a function's body is actually being
-      // *executed*. A function that's defined but never called (like a
-      // `need()` nobody calls from `main()`) has dead code from the
-      // interpreter's point of view, so its declarations were never
-      // checked and no error ever appeared, even though real C code with
-      // duplicate locals fails to compile regardless of whether the
-      // function is ever invoked. Statically walk the freshly-parsed body
-      // right here, at parse time, so every function's declarations are
-      // checked unconditionally — matching real compiler behavior — before
-      // the program is ever run.
       this._staticCheckFnBody(body);
     } else {
-      // FIX (global array/struct initializers not visualizing): this used
-      // to call `this._parseExpr()` for a global initializer. `_parseExpr`
-      // bottoms out in `_parsePrim()`, whose handling of a bare `{` is:
-      //
-      //   if(t.v==='{'){
-      //     let depth=1; while(depth>0 ...) { ... } this._nx();
-      //     return {type:'lit', v:0, ln:t.ln};
-      //   }
-      //
-      // i.e. it just SKIPS the entire brace-enclosed initializer list and
-      // throws it away, returning the literal 0. That's why a global like
-      // `char g[10] = {'A','n','i','s'};` or `int g[5] = {1,2,3,4,5};`
-      // silently became `g = 0` — the initializer never became an
-      // `arrlit` AST node, so `_flattenInit()` in `_initGlobals()` never
-      // saw a real list to flatten. A plain string initializer
-      // (`char g[] = "Anisur";`) happened to work anyway because a string
-      // token is handled directly in `_parsePrim()` without ever hitting
-      // the `{` branch.
-      //
-      // Local declarations never had this problem because `_parseDecl()`
-      // already used `_parse2DInit()`, which recursively builds a proper
-      // `{type:'arrlit', items:[...]}` node (including nested braces for
-      // 2D arrays). Switching global initializer parsing to the same
-      // `_parse2DInit()` fixes every global initializer form — char
-      // arrays, int arrays, float arrays, 2D arrays, and struct literals —
-      // to match local-variable behavior exactly.
-      //
-      // We also now parse an optional second `[...]` dimension here
-      // (`arrSize2`), which previously wasn't recognized at all for
-      // globals, so that a global 2D array like
-      // `int g_grid[2][3] = {{1,2,3},{4,5,6}};` parses and visualizes
-      // correctly too (see the matching `_initGlobals()` fix below).
       let isArr=false,sz=null,sz2=null;
       if(this._pk().v==='['){
         this._nx();isArr=true;if(this._pk().v!==']')sz=this._parseExpr();this._ex(']');
@@ -2320,16 +2252,6 @@ class CInterpreter {
         decls.push({name:nm2,isArr:ia2,arrSize:sz2b,arrSize2:sz2b2,init:init2});
       }
       this._ex(';');
-      // FIX (global redefinition): this used to check
-      // `this._globalFrame.vars[d.name]`, but `_globalFrame.vars` is only
-      // populated later by `_initGlobals()` — at parse time it's always
-      // empty, so this check never fired and `this.globals[d.name]=...`
-      // below just silently overwrote each earlier global with the same
-      // name (last declaration wins, no error at all). Track declared
-      // global names/types ourselves as we parse them, in a plain map that
-      // exists for the lifetime of parsing, and reuse the same GCC-style
-      // two-part "redefinition ... / note: previous definition is here"
-      // error used for local-variable redeclaration inside functions.
       this._globalDeclTypes = this._globalDeclTypes || {};
       for(const d of decls) {
         let typeStr = type;
@@ -2523,26 +2445,6 @@ class CInterpreter {
 }
 
   _initGlobals(){
-    // FIX (global array/struct initializers not visualizing): this
-    // previously handled only 1D arrays (via `_flattenInit`) and, for
-    // non-array globals, just did `this._eval(g.init, this._globalFrame)`
-    // for ANY initializer — including a struct brace-list like
-    // `struct Point g_point = {7, 9};`, whose `arrlit` node would get
-    // `_eval`'d into a plain JS array `[7, 9]` instead of an object keyed
-    // by the struct's field names (`{x:7, y:9}`), breaking any later
-    // `g_point.x` access. There was also no handling at all for a global
-    // 2D array (`arrSize2`), since that dimension wasn't even parsed
-    // before (see `_parseTopLevel` fix above).
-    //
-    // This rewrite mirrors `_execDecl()`'s logic for local variables:
-    //  - 1D arrays: flatten + pad/truncate to the declared size.
-    //  - 2D arrays: build each row from either a nested arrlit
-    //    (`{{1,2},{3,4}}`) or a flat list, matching local behavior.
-    //  - struct literals: walk the struct's field list in order and
-    //    assign each initializer item to the matching field name, so
-    //    `g_point.x` / `g_point.y` work exactly like a local struct.
-    //  - a struct with NO initializer still default-constructs its
-    //    fields (unchanged from before).
     for(const [name,g] of Object.entries(this.globals)){
       if(this._globalFrame.vars[name]) continue;
       let val;
@@ -2602,10 +2504,6 @@ class CInterpreter {
         } else if (/^struct\b/.test(g.type)) {
           throw new Error(`error: unknown type name 'struct ${structName}' — no 'struct ${structName} { ... };' was defined`);
         } else {
-          // Not a known struct type but got a brace-list initializer
-          // (e.g. a scalar with a redundant `{...}` wrapper) — fall back
-          // to flattening and taking the first value, matching how a
-          // real compiler would treat a scalar's braced initializer.
           const flat = this._flattenInit(g.init, this._globalFrame);
           val = flat.length ? flat[0] : 0;
         }
@@ -2652,25 +2550,12 @@ class CInterpreter {
 }
 
   _checkHomogeneous(node){
-    // Enforce homogeneous literal kinds within a plain array brace-initializer
-    // like `int arr[3] = {1, 2, 3};` or `{{1,2},{3,4}}`. This is intentionally
-    // ONLY ever reached for genuine array declarations — see call sites: it's
-    // invoked exclusively from _flattenInit(), which is itself only called on
-    // the top-level initializer of a real array (`d.isArr` in _execDecl, or
-    // `g.isArr` in _initGlobals). Struct literals such as
-    // `struct Student s = {"Anisur", 25, 4.56};` are handled by a completely
-    // separate branch (in _execDecl for locals and _initGlobals for globals)
-    // that walks `d.init.items` / `g.init.items` field-by-field and only
-    // recurses into _flattenInit for an individual field that is itself a
-    // nested `{...}` (e.g. an array-typed struct field, which really is
-    // homogeneous by C's type system). So this check never fires for
-    // struct/union/enum initializers — only for actual arrays.
     if(!node || node.type!=='arrlit') return;
     let kind=null, kindLn=null;
     for(const item of node.items){
       if(item && item.type==='arrlit'){ this._checkHomogeneous(item); continue; }
       const k=this._literalKind(item);
-      if(k===null) continue; // skip non-literal items (variables/expressions) — can't classify statically
+      if(k===null) continue;
       if(kind===null){ kind=k; kindLn=item.ln; }
       else if(kind!==k){
         const ln=item.ln||kindLn||0;
@@ -2708,9 +2593,6 @@ class CInterpreter {
     throw new Error(`error: '${name}' undeclared (first use in this function) (line ${line})`);
   }
 
-  // Builds a human-readable type string for a single declared variable,
-  // e.g. "int" or "int [10]" / "char [10]", used both to remember what a
-  // name was first declared as, and to report a real redefinition.
   _declTypeStr(s, d, frame) {
     let t = s.varType;
     if (d.isArr) {
@@ -2726,15 +2608,6 @@ class CInterpreter {
     return t;
   }
 
-  // ── Lexical block scoping for redeclaration tracking ──────────────────────
-  // Every `{ ... }` block, every `for` loop (init clause + its iterations),
-  // and every `switch` body pushes a scope. A scope remembers exactly which
-  // names it declared ("own") and what those names resolved to in the
-  // enclosing scope before it shadowed them ("outerSaved"). When the scope
-  // ends we restore the enclosing view — this is what lets the same name
-  // (e.g. a loop counter `i`) be legally re-declared in a *sibling* scope
-  // (two separate `for` loops in the same function) while still catching a
-  // genuine duplicate declaration written twice in the *same* block.
   _pushScope(frame) {
     frame._declTypes = frame._declTypes || {};
     frame._scopeStack = frame._scopeStack || [];
@@ -2757,9 +2630,6 @@ class CInterpreter {
     }
   }
 
-  // Builds the GCC-style two-part error ("redefinition ... / note: previous
-  // definition is here ...") for both the same-datatype and different-datatype
-  // cases.
   _buildRedefError(s, d, prevRecord, typeStr, sameType) {
     const newSizeM = typeStr.match(/\[(.*)\]$/);
     const prevSizeM = prevRecord.type.match(/\[(.*)\]$/);
@@ -2820,14 +2690,6 @@ class CInterpreter {
     frame._declTypes[d.name] = record;
   }
 
-  // ── Static (compile-time) redeclaration check for function bodies ────────
-  // Mirrors `_checkRedeclaration`'s same-block-vs-sibling-scope logic above,
-  // but walks the parsed AST directly instead of live execution frames, so
-  // it runs once at parse time for every function — whether or not that
-  // function ever actually gets called at runtime. Only scalar/array type
-  // strings are needed here (no expression evaluation is possible yet,
-  // since nothing has run), which is enough to reproduce GCC-style
-  // same-type vs different-type redefinition messages.
   _staticDeclTypeStr(varType, d) {
     let t = varType;
     if (d.isArr) {
@@ -2924,7 +2786,7 @@ class CInterpreter {
         }
         break;
       default:
-        break; // return / break / continue / expr — no nested declarations
+        break;
     }
   }
 
@@ -3018,15 +2880,6 @@ class CInterpreter {
     }
   }
 
-  // `opts.silent` (used only by the for-loop init/update clauses) executes
-  // the declaration's side effects — validation, redeclaration checking,
-  // value construction, and storing into frame.vars — WITHOUT emitting its
-  // own step. This lets `_execFor` add exactly one unified step tagged
-  // `part:'for-init'` for the whole clause instead of two back-to-back
-  // steps (a generic "Declare ..." step immediately followed by a
-  // redundant for-init step) that would otherwise fight over the
-  // highlight and flicker between the whole-statement box and the small
-  // for-clause box.
   _execDecl(s,frame,opts={}){
     for(const d of s.decls){
       this._checkRedeclaration(s, d, frame);
@@ -3142,24 +2995,26 @@ class CInterpreter {
       const nm=this._exprName(e.l);
       this._addStep({ln:s.ln,desc:`Assign <code>${nm}</code> ${e.op} &rarr; <b>${this._fv(v)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:nm});
     } else if(e.type==='post'||e.type==='pre'){
-      // NOTE: `v` is the RESULT of evaluating the whole ++/-- expression,
-      // not necessarily the variable's final stored value: post-increment
-      // (`j++`) evaluates to the OLD value even though it also updates the
-      // variable, while pre-increment (`++j`) evaluates to the NEW value.
-      // Using `v` directly here for BOTH cases used to make the step
-      // description for a post-increment/decrement say "now <old value>",
-      // which visibly disagreed with the Variables panel (which always
-      // shows the variable's真 current/updated value from the snapshot
-      // taken after the operation completed). Re-read the target variable
-      // itself (now that the increment/decrement has already been applied)
-      // so the description always reports the actual, current value —
-      // matching what the Variables panel shows.
       const nm=this._exprName(e.x);
       const nowVal=this._eval(e.x,frame);
       this._addStep({ln:s.ln,desc:`<code>${nm}${e.op}</code> &rarr; now <b>${this._fv(nowVal)}</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name),chg:nm});
     }
   }
   _exprName(e){ if(!e)return'?'; if(e.type==='id')return e.n; if(e.type==='sub')return this._exprName(e.x); if(e.type==='mem')return this._exprName(e.x); if(e.type==='deref')return this._exprName(e.x); return '?'; }
+
+  // Records an array-subscript touch ({name, idx, op}) so the UI can
+  // highlight the corresponding cell(s) for the current step. `xNode` is
+  // the base-expression AST node of a `sub` (e.g. the `arr` in `arr[j]`);
+  // `_exprName` resolves it down to the underlying variable name the same
+  // way step descriptions already do. Non-numeric indices or unresolved
+  // names are silently skipped (nothing to highlight).
+  _recordTouch(xNode, idx, op){
+    if(!this._touchLog) this._touchLog=[];
+    if(typeof idx!=='number' || !Number.isFinite(idx)) return;
+    const name=this._exprName(xNode);
+    if(!name || name==='?') return;
+    this._touchLog.push({name, idx: Math.trunc(idx), op});
+  }
 
   _execRet(s,frame){
     if (s.val) {
@@ -3191,19 +3046,6 @@ class CInterpreter {
     }
   }
 
-  // The for-loop is broken into four distinct, individually-highlighted
-  // phases — exactly mirroring how a learner reads `for (init; cond; upd)`:
-  //   1. for-init   — runs once, highlighted to just the init clause text
-  //   2. for-cond   — runs before every iteration (and the final, failing
-  //                   check that ends the loop), highlighted to the cond
-  //                   clause text
-  //   3. body       — the loop body's own statements, each already
-  //                   highlighted individually via the normal statement path
-  //   4. for-update — runs after every iteration's body, highlighted to
-  //                   the update clause text
-  // Each phase is tagged with `part` so the front-end knows to compute a
-  // tight sub-range highlight (via extractForClauses) instead of the
-  // whole-line/whole-statement box used elsewhere.
   _execFor(s,frame){
     const scope=this._pushScope(frame);
     try{
@@ -3232,20 +3074,6 @@ class CInterpreter {
         if(s.update){
           this._validateExprVariables(s.update, frame);
           this._eval(s.update,frame);
-          // FIX: `_eval(s.update, frame)` returns the RESULT of evaluating
-          // the update expression, which for a post-increment/decrement
-          // (`j++` / `j--`) is the value BEFORE the change (post-inc/dec
-          // evaluate to the old value in C, even though they still perform
-          // the update). The description previously displayed that raw
-          // return value directly as "now <value>", so for `j++` it showed
-          // the OLD value (e.g. "now 2") right as the Variables panel
-          // (snapshotted immediately after, via `_snapFrames()`) already
-          // reflects the truly updated value (e.g. 3) — a visible mismatch
-          // like the one reported. Re-reading the target variable itself
-          // after the update has been applied guarantees the description
-          // always matches what the Variables panel shows, regardless of
-          // whether the update was post-inc/dec, pre-inc/dec, or a plain
-          // assignment/compound-assignment.
           const targetNode = (s.update.type==='post'||s.update.type==='pre') ? s.update.x
                             : (s.update.type==='bin' ? s.update.l : s.update);
           const nm=this._exprName(targetNode);
@@ -3329,6 +3157,7 @@ class CInterpreter {
       case 'tern':return this._eval(e.c,frame)?this._eval(e.t,frame):this._eval(e.e,frame);
       case 'sub': {
         const arr=this._eval(e.x,frame);const idx=this._eval(e.i,frame);
+        this._recordTouch(e.x, idx, 'read');
         if(Array.isArray(arr))return arr[idx]??0;
         if(typeof arr==='string'&&this._heap[arr]){const blk=this._heap[arr];return(blk.arr&&blk.arr[idx]!==undefined)?blk.arr[idx]:0;}
         if(typeof arr==='string')return arr.charCodeAt(idx)||0;
@@ -3414,13 +3243,6 @@ class CInterpreter {
       for(let i=this._callStack.length-1;i>=0;i--){
         const f=this._callStack[i];
         if(f.vars[n]!==undefined)return{get:()=>f.vars[n].value,set:v=>{
-          // FIX (const reassignment protection): a variable declared with
-          // the `const` qualifier (e.g. `const int MAX = 100;`) must not be
-          // writable after its initial declaration. The initial value is
-          // set directly by `_execDecl` (which never goes through `_lval`),
-          // so this check only ever fires on a genuine *re*-assignment —
-          // via `=`, a compound assignment (`+=`, `-=`, ...), or `++`/`--` —
-          // all of which route through this setter.
           if(f.vars[n].isConst) throw new Error(`The value of const variable '${n}' is unchangable, don't change it${e.ln?` (line ${e.ln})`:''}`);
           f.vars[n].value=v;f.vars[n].changed=true;
         }};
@@ -3439,10 +3261,11 @@ class CInterpreter {
       const ref=this._lval(e.x,frame); const idx=this._eval(e.i,frame);
       if(ref){
         const cur=ref.get();
-        if(Array.isArray(cur))return{get:()=>cur[idx]??0,set:v=>{cur[idx]=v;}};
+        if(Array.isArray(cur))return{get:()=>{this._recordTouch(e.x,idx,'read');return cur[idx]??0;},set:v=>{this._recordTouch(e.x,idx,'write');cur[idx]=v;}};
         if(typeof cur==='string'&&this._heap[cur]){
           const blk=this._heap[cur]; if(!blk.arr)blk.arr=[];
-          return{get:()=>blk.arr[idx]??0,set:v=>{
+          return{get:()=>{this._recordTouch(e.x,idx,'read');return blk.arr[idx]??0;},set:v=>{
+            this._recordTouch(e.x,idx,'write');
             blk.arr[idx]=v;
             blk.data[idx]=v;
             if(blk.init) blk.init[idx]=true;
@@ -3450,10 +3273,11 @@ class CInterpreter {
         }
       }
       const base=this._eval(e.x,frame);
-      if(Array.isArray(base))return{get:()=>base[idx]??0,set:v=>{base[idx]=v;}};
+      if(Array.isArray(base))return{get:()=>{this._recordTouch(e.x,idx,'read');return base[idx]??0;},set:v=>{this._recordTouch(e.x,idx,'write');base[idx]=v;}};
       if(typeof base==='string'&&this._heap[base]){
         const blk=this._heap[base]; if(!blk.arr)blk.arr=[];
-        return{get:()=>blk.arr[idx]??0,set:v=>{
+        return{get:()=>{this._recordTouch(e.x,idx,'read');return blk.arr[idx]??0;},set:v=>{
+          this._recordTouch(e.x,idx,'write');
           blk.arr[idx]=v;
           blk.data[idx]=v;
           if(blk.init) blk.init[idx]=true;
@@ -3622,26 +3446,6 @@ class CInterpreter {
       case 'fgets':return args[2];
     }
 
-    // ── Recursive/normal user-function call: highlight the CALL SITE first ──
-    // Previously, a user-defined function was invoked directly via
-    // `_callFn(fnName,args,e.fn)` with no step added at the caller's own
-    // line beforehand. For a statement like `return n * factorial(n - 1);`,
-    // `_eval()` fully resolves the call (walking all the way down through
-    // the recursion) BEFORE `_execRet()` adds its own "return ..." step —
-    // so the line containing the recursive call itself was never
-    // highlighted at the moment the call was actually being made; the
-    // green indicator only ever appeared on the callee's own body line
-    // (via `_callFn`'s "Called ..." step) and, afterwards, back on the
-    // original line once the whole expression had already finished
-    // evaluating. This meant every recursive call "skipped" showing the
-    // caller's line as the point of the call.
-    //
-    // Fix: right before diving into `_callFn`, add a step highlighting the
-    // call-site line (`ln`, taken from the call's own token position) with
-    // a short "About to call ..." description. This makes each recursive
-    // step in `factorial(5) -> factorial(4) -> ... -> factorial(1)` visibly
-    // highlight the exact line making the call, before stepping into the
-    // callee — matching how a learner traces recursion by hand.
     if(typeof fnName==='string' && this.functions[fnName]){
       this._addStep({ln,desc:`About to call <b>${fnName}(${args.map(a=>this._fv(a)).join(', ')})</b>`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
       return this._callFn(fnName,args,e.fn);
@@ -3694,10 +3498,6 @@ class CInterpreter {
       if (!f) continue;
       for (const [k, v] of Object.entries(f.vars)) {
         if (v.addr === addr) {
-          // FIX (const reassignment protection): scanf writing into a
-          // pointer/address that belongs to a `const` variable is still a
-          // reassignment and must be rejected the same way a normal `=`
-          // assignment is.
           if (v.isConst) throw new Error(`The value of const variable '${k}' is unchangable, don't change it`);
           v.value = value; v.changed = true; return true;
         }
@@ -3948,7 +3748,14 @@ class CInterpreter {
   // un-memoized recursive Fibonacci) can still be stepped through in full
   // for the input sizes a learner would realistically try, instead of the
   // trace silently stopping partway through.
-  _addStep(s){if(this.steps.length<5000)this.steps.push(s);}
+  //
+  // Also attaches (and clears) the `touches` array recorded via
+  // `_recordTouch` during this step's evaluation, so the UI can highlight
+  // exactly which array cell(s) were just read/written/compared.
+  _addStep(s){
+    s.touches = this._touchLog ? this._touchLog.splice(0) : [];
+    if(this.steps.length<5000)this.steps.push(s);
+  }
 }
 
 // ─── UI ──────────────────────────────────────────────────────────────────────
@@ -3968,8 +3775,6 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
   applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
 });
 
-// ── Mobile-friendly detection ────────────────────────────────────────────────
-// Used below to make focus/keyboard handling more robust on touch devices.
 const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
 
 const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), {
@@ -3982,16 +3787,6 @@ const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), 
   indentUnit: 4,
   tabSize: 4,
   indentWithTabs: false,
-  // NOTE (mobile typing): a previous version of this file forced
-  // inputStyle:'contenteditable' on touch devices to try to make the
-  // on-screen keyboard pop up more reliably. CodeMirror 5's own docs flag
-  // 'contenteditable' as still having "a lot of bugs" — and in practice
-  // that's what broke typing on mobile: keystrokes/composition events get
-  // lost or misplaced, especially once ghost-text widgets are inserted
-  // near the cursor (see c_autocom.js). The default 'textarea' input
-  // style is the well-tested path and reliably accepts typed characters
-  // on iOS Safari and Chrome/Android, so we keep it on every device and
-  // fix mobile focus/keyboard behavior separately below instead.
   inputStyle: 'textarea',
   extraKeys: {
     'Tab': cm => cm.execCommand('indentMore'),
@@ -4006,12 +3801,6 @@ const cmEditor = CodeMirror.fromTextArea(document.getElementById('code-input'), 
 cmEditor.setValue(SAMPLES.memory_layout);
 cmEditor.setSize('100%', '100%');
 
-// FIX (mobile typing): CodeMirror's hidden input textarea inherits the
-// browser's default autocapitalize/autocorrect/spellcheck behavior, which
-// on mobile keyboards can mangle C code (capitalizing keywords, silently
-// "correcting" identifiers) and on some Android keyboards can even swallow
-// keystrokes while it tries to build a suggestion. Turn all of that off on
-// the actual input element CodeMirror uses.
 (function hardenMobileInputField() {
   const field = cmEditor.getInputField();
   if (!field) return;
@@ -4021,19 +3810,6 @@ cmEditor.setSize('100%', '100%');
   field.setAttribute('spellcheck', 'false');
 })();
 
-// FIX (mobile typing): make sure a tap anywhere inside the editor actually
-// focuses CodeMirror and opens the virtual keyboard. On some mobile
-// browsers a tap that lands on the code area but not exactly on the
-// existing cursor/input node doesn't forward focus automatically —
-// especially right after the page loads, after switching tabs/panels, or
-// after the keyboard has been dismissed. This listener is a light,
-// harmless safety net: if the editor isn't already focused when the user
-// taps/clicks it, explicitly focus it (and place the cursor at the tapped
-// location when possible). On touch devices we defer the focus call by a
-// tick and focus the underlying <textarea> directly — some mobile browsers
-// only reliably raise the on-screen keyboard when focus() is called on the
-// real input element rather than proxied synchronously out of a touch
-// handler.
 const cmWrapperEl = cmEditor.getWrapperElement();
 cmWrapperEl.style.webkitUserSelect = 'text';
 cmWrapperEl.style.userSelect = 'text';
@@ -4056,10 +3832,6 @@ function ensureEditorFocused(evt) {
   }
 
   if (isTouchDevice) {
-    // Give the browser a moment to finish handling the touch gesture
-    // before stealing focus — calling focus() synchronously inside a
-    // touchend handler is unreliable for raising the keyboard on some
-    // Android/iOS browser versions.
     setTimeout(doFocus, 0);
   } else {
     doFocus();
@@ -4068,9 +3840,6 @@ function ensureEditorFocused(evt) {
 cmWrapperEl.addEventListener('touchend', ensureEditorFocused, { passive: true });
 cmWrapperEl.addEventListener('click', ensureEditorFocused);
 
-// ─── Step-indicator styling ────────────────────────────────────────────────
-// Injected once here so the execution highlight styling is always available
-// regardless of the host page's stylesheet.
 (function injectExecSegmentStyles(){
   if (document.getElementById('exec-segment-styles')) return;
   const style = document.createElement('style');
@@ -4096,21 +3865,6 @@ cmWrapperEl.addEventListener('click', ensureEditorFocused);
   document.head.appendChild(style);
 })();
 
-// FIX (Variables table missing the "Type" column on some layouts, e.g.
-// narrow/mobile viewports): the Variables table is built with a
-// `<th class="col-type">Type</th>` header and a matching
-// `<td class="col-type">...</td>` cell for every row (see renderFrames()
-// below) — the column has always been part of the markup. However, an
-// external stylesheet on the host page hides `.col-type` (along with
-// `.col-size`/`.col-addr`) at narrower widths to save horizontal space,
-// which is why "Type" disappears from the Variables panel on phones even
-// though Name → Type → Value → Binary → Size → Address is the intended,
-// already-correct column order. Since the Type column is core information
-// (not just a "nice to have"), force it to always render as a normal table
-// cell regardless of any responsive/media-query rule that may be hiding it
-// elsewhere. The `.vtbl-wrap` container already scrolls horizontally, so
-// forcing this column back on simply means the table scrolls a bit further
-// on very narrow screens instead of silently dropping the column.
 (function injectTypeColumnVisibilityFix(){
   if (document.getElementById('type-col-visibility-fix')) return;
   const style = document.createElement('style');
@@ -4125,22 +3879,8 @@ cmWrapperEl.addEventListener('click', ensureEditorFocused);
   document.head.appendChild(style);
 })();
 
-// Tracks the single live CodeMirror markText range used for the
-// execution indicator, so each new step can clear the previous one before
-// drawing its own.
 let execMark = null;
 
-// Finds `for ( init ; cond ; update )` on a single source line and returns
-// the three clauses' character ranges (relative to that line), so a for-loop
-// step can be highlighted down to just the piece of the header currently
-// executing (matching how a person would trace the loop by hand: first the
-// init, then the condition, then — after the body runs — the update, then
-// the condition again, and so on until the loop ends).
-//
-// Splitting on ';' only counts at paren/bracket depth 0 within the header,
-// so a condition like `for (i = f(a; b); ...)` (unusual, but harmless to
-// guard against) or an array index inside the header doesn't get split in
-// the wrong place.
 function extractForClauses(lineText) {
   if (!lineText) return null;
   const forMatch = /\bfor\b/.exec(lineText);
@@ -4176,16 +3916,11 @@ function extractForClauses(lineText) {
     const start = offset + leadWs;
     const end = start + trimmed.length;
     clauses.push(trimmed.length ? { start, end } : null);
-    offset += p.length + 1; // +1 skips the ';' that followed this clause
+    offset += p.length + 1;
   }
   return clauses;
 }
 
-// Finds the `( ... )` clause immediately following a keyword like `if`,
-// `while`, or `switch` on a single line, and returns its inner (paren-
-// excluded) character range. Used to give if/while/switch conditions the
-// same tight treatment as for-loop clauses, rather than highlighting
-// the whole statement.
 function extractParenClauseAfter(lineText, keyword) {
   if (!lineText) return null;
   const re = new RegExp('\\b' + keyword + '\\b');
@@ -4208,13 +3943,6 @@ function extractParenClauseAfter(lineText, keyword) {
   return { start, end: start + trimmed.length };
 }
 
-// Computes the { line, chStart, chEnd } range to spotlight for a given
-// interpreter step. For-loop init/condition/update phases resolve to just
-// that clause inside the `for (...)` header; if/while/switch conditions
-// resolve to just the parenthesized expression; everything else falls back
-// to the statement's trimmed text on its line (i.e. the whole line minus
-// leading/trailing whitespace) — still a tight box, just without needing to
-// parse sub-clauses out of it.
 function computeHighlightRange(step) {
   const lineIdx = (step.ln || 1) - 1;
   const lineText = cmEditor.getLine(lineIdx);
@@ -4239,9 +3967,6 @@ function computeHighlightRange(step) {
   return { line: lineIdx, chStart: trimmedStart, chEnd: trimmedEnd };
 }
 
-// Draws the execution indicator for the given step, replacing whatever was
-// drawn for the previous step. Uses a single green rectangle for the entire
-// statement being executed (or clause in for-loop), not word-by-word.
 function highlightSegment(step) {
   if (execMark) { try { execMark.clear(); } catch(e){} execMark = null; }
   clearLineHL();
@@ -4262,8 +3987,6 @@ function highlightSegment(step) {
   } catch(e) { /* line/ch out of range — silently skip */ }
 }
 
-
-// ── Element refs ─────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const runBtn = $('run-btn'), resetBtn = $('reset-btn'), clearBtn = $('clear-btn');
 const prevBtn = $('prev-btn'), nextBtn = $('next-btn');
@@ -4284,9 +4007,6 @@ const arrowSvg  = $('arrow-svg');
 const arrowToggle = $('arrow-toggle');
 const heapDragLayer = $('heap-drag-layer');
 
-// Remembers a manually-dragged (or auto-cascaded) position for each live heap
-// address, keyed by address string, e.g. {"0x2000": {x:120,y:40}}. Cleared
-// whenever a fresh run starts so a new program gets a clean auto-layout.
 let heapPositions = {};
 
 sampleSel.addEventListener('change', () => {
@@ -4441,14 +4161,46 @@ document.addEventListener('keydown', e => {
   if (e.key === 'F5') { e.preventDefault(); runVisualize(); }
 });
 
+// Derives the current comparison state from a step's own description,
+// but only for `if`/`while`/`do`/`switch` condition steps (`part ===
+// 'cond-paren'`). Used to decide whether a just-read array cell should
+// glow green ("match" — e.g. `if (arr[mid] == target)` was true) or amber
+// ("compare" — the condition was false), so a search algorithm's progress
+// is visible cell-by-cell as it steps through the array.
+function getMatchState(step) {
+  if (!step || step.part !== 'cond-paren') return null;
+  if (/\btrue\b/i.test(step.desc || '')) return 'true';
+  if (/\bfalse\b/i.test(step.desc || '')) return 'false';
+  return null;
+}
+// Filters a step's touch log down to the entries for one variable name
+// (e.g. "arr"), so each array's own cells only reflect touches made
+// through that same variable.
+function getTouchesForName(step, name) {
+  if (!step || !step.touches || !name) return [];
+  return step.touches.filter(t => t.name === name);
+}
+// Finds which local/global pointer variable (if any) currently holds a
+// given heap address, so a heap block's cell touches (recorded against the
+// pointer's *name*, e.g. "heapArr[i]") can be matched back to that block.
+function getPointerNameForAddr(frames, addr) {
+  if (!frames) return null;
+  for (const fr of frames) {
+    for (const [k, v] of Object.entries(fr.vars || {})) {
+      if (v.value === addr) return k;
+    }
+  }
+  return null;
+}
+
 function renderStep(idx) {
   const step = interp.steps[idx]; if (!step) return;
   showWalk('', step.desc || '');
   highlightSegment(step);
   sbLine.textContent = step.ln || '—';
   outputArea.textContent = step.out && step.out.length ? step.out : '— no output yet —';
-  renderFrames(step.frames, step.chg);
-  renderHeap(step.heap);
+  renderFrames(step.frames, step.chg, step);
+  renderHeap(step.heap, step);
   renderCS(step.cs);
   renderMM(step.frames, step.heap);
   drawArrows();
@@ -4485,8 +4237,37 @@ function segBadge(seg) {
   return `<span class="seg-badge ${seg}">${labels[seg] || seg}</span>`;
 }
 
-function buildArrCellsHtml(val, type, isChar, initArr) {
+// Renders one row of array cells. Beyond the existing decimal/binary/index
+// display, this now also:
+//  - draws a value-proportional vertical bar under each numeric (non-char)
+//    cell, scaled against the largest |value| currently in the array — the
+//    classic "sorting visualizer" bar-chart look, so array height reflects
+//    value;
+//  - colors a cell orange ("swap") if it was just written to in the
+//    current step (e.g. the two cells a bubble/selection/insertion sort
+//    just swapped);
+//  - colors a cell blue ("touch") if it was just read in the current step
+//    with no associated comparison result yet, amber ("compare") if it was
+//    read as part of a false comparison, or green with a "✓ found" badge
+//    ("match") if it was read as part of a comparison that evaluated true
+//    — this lights up the exact cell a search algorithm just checked, and
+//    turns it green the moment `arr[i] == key` succeeds.
+function buildArrCellsHtml(val, type, isChar, initArr, touches, matchState) {
   const charMode = isChar || (type && type.includes('char'));
+  touches = touches || [];
+  const touchByIdx = {};
+  touches.forEach(t => {
+    // A write always wins over a read for the same index within one step
+    // (e.g. `arr[j] = arr[j+1]` both reads j+1 and writes j in one step).
+    if (touchByIdx[t.idx] !== 'write') touchByIdx[t.idx] = t.op;
+  });
+
+  let maxAbs = 0;
+  if (!charMode) {
+    val.forEach(v => { const n = Math.abs(Number(v) || 0); if (n > maxAbs) maxAbs = n; });
+  }
+  const BAR_MIN = 6, BAR_MAX = 64;
+
   let html = '<div class="arr-row">';
   val.forEach((c, ci) => {
     const num = Number(c) || 0;
@@ -4499,13 +4280,35 @@ function buildArrCellsHtml(val, type, isChar, initArr) {
       glyph = isInit ? String(num) : '?';
     }
     const binStr = toBinaryStr(num, charMode ? 'char' : (type || 'int'));
-    html += `<div class="arr-cell" title="dec:${num}&#10;bin:${binStr}${isInit?'':'&#10;(uninit)'}"><span style="font-size:11px">${String(glyph).replace(/</g,'&lt;')}</span><span class="ac-bin">${toBinaryHtml(num, charMode ? 'char' : (type || 'int'))}</span><span style="display:block;margin-top:1px;font-size:8px;color:var(--text3);text-align:center">[${ci}]</span></div>`;
+
+    let cellClass = 'arr-cell';
+    const op = touchByIdx[ci];
+    if (op === 'write') {
+      cellClass += ' arr-cell-swap';
+    } else if (op === 'read') {
+      if (matchState === 'true') cellClass += ' arr-cell-match';
+      else if (matchState === 'false') cellClass += ' arr-cell-compare';
+      else cellClass += ' arr-cell-touch';
+    }
+
+    let barHtml = '';
+    if (!charMode) {
+      const ratio = maxAbs > 0 ? Math.abs(num) / maxAbs : 0;
+      const h = Math.round(BAR_MIN + ratio * BAR_MAX);
+      barHtml = `<span class="ac-bar-track"><span class="ac-bar-fill" style="height:${h}px"></span></span>`;
+    }
+
+    html += `<div class="${cellClass}" title="dec:${num}&#10;bin:${binStr}${isInit?'':'&#10;(uninit)'}">` +
+      `<span class="ac-val" style="font-size:11px">${String(glyph).replace(/</g,'&lt;')}</span>` +
+      barHtml +
+      `<span class="ac-bin">${toBinaryHtml(num, charMode ? 'char' : (type || 'int'))}</span>` +
+      `<span class="ac-idx">[${ci}]</span></div>`;
   });
   html += '</div>';
   return html;
 }
 
-function renderFrames(frames, chg) {
+function renderFrames(frames, chg, step) {
   if (!frames || !frames.length) {
     framesEl.innerHTML = '<div class="empty"><i class="fa-solid fa-box-open"></i><p>No stack frames yet. Run the visualizer to see variables.</p></div>';
     sbFrames.textContent = '0'; return;
@@ -4550,12 +4353,14 @@ function renderFrames(frames, chg) {
         let vhtml, binHtml = '<span class="vbin">—</span>';
         if (isArr) {
           const is2D = val.length > 0 && Array.isArray(val[0]);
+          const matchState = getMatchState(step);
+          const touches = getTouchesForName(step, name);
           if (is2D) {
             vhtml = '<div style="display:flex;flex-direction:column;gap:3px">';
             val.forEach((row) => { vhtml += buildArrCellsHtml(row, v.type, false); });
             vhtml += '</div>';
           } else {
-            vhtml = buildArrCellsHtml(val, v.type, v.type && v.type.includes('char'));
+            vhtml = buildArrCellsHtml(val, v.type, v.type && v.type.includes('char'), null, touches, matchState);
           }
         } else if (val && typeof val === 'object' && !Array.isArray(val)) {
           vhtml = `<span style="color:var(--text2);font-size:11.5px">{${Object.entries(val).map(([k2,v2])=>`${k2}: ${fieldToDisplay(v2)}`).join(', ')}}</span>`;
@@ -4606,7 +4411,7 @@ function renderFrames(frames, chg) {
   }
 }
 
-function renderHeap(heap) {
+function renderHeap(heap, step) {
   if (!heap || !Object.keys(heap).length) {
     heapSec.style.display = '';
     heapBlocks.innerHTML = '<div class="empty"><i class="fa-solid fa-database"></i><p>No heap allocations yet. malloc/calloc will appear here.</p></div>';
@@ -4620,6 +4425,7 @@ function renderHeap(heap) {
   Object.keys(heapPositions).forEach(a => { if (!heap[a]) delete heapPositions[a]; });
 
   const addrList = Object.keys(heap);
+  const frames = step ? step.frames : null;
   addrList.forEach((addr, idx) => {
     const block = heap[addr];
     const d = document.createElement('div'); d.className = 'heap-block';
@@ -4668,7 +4474,10 @@ function renderHeap(heap) {
     } else if (block.arr && block.arr.length) {
       const body = document.createElement('div');
       body.className = 'hb-body';
-      body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar, block.init);
+      const ptrName = getPointerNameForAddr(frames, addr);
+      const touches = getTouchesForName(step, ptrName);
+      const matchState = getMatchState(step);
+      body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar, block.init, touches, matchState);
       d.appendChild(body);
     }
 
