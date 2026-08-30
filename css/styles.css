@@ -1,5 +1,5 @@
 :root,[data-theme="dark"]{--vsc-bg:#1e1e1e;--vsc-sidebar:#252526;--vsc-actbar:#333333;--vsc-panel:#1e1e1e;--vsc-titlebar:#3c3c3c;--vsc-input:#3c3c3c;--vsc-border:#3c3c3c;--vsc-border2:#454545;--vsc-hover:#2a2d2e;--vsc-selected:#094771;--vsc-tab-active:#1e1e1e;--vsc-tab-inactive:#2d2d2d;--vsc-tab-border:#007acc;--vsc-status:#007acc;--vsc-status-text:#ffffff;--vsc-accent:#007acc;--vsc-accent2:#0e639c;--vsc-green:#4ec9b0;--vsc-green2:#23d18b;--vsc-red:#f48771;--vsc-yellow:#cca700;--vsc-orange:#d7ba7d;--vsc-purple:#c586c0;--vsc-blue:#9cdcfe;--vsc-blue2:#569cd6;--vsc-cyan:#4ec9b0;--text:#cccccc;--text2:#8c8c8c;--text3:#5a5a5a;--text-bright:#e8e8e8;--scrollbar:#424242;--scrollbar-hover:#686868;--tok-keyword:#569cd6;--tok-type:#4ec9b0;--tok-fn:#dcdcaa;--tok-var:#9cdcfe;--tok-string:#ce9178;--tok-number:#b5cea8;--tok-comment:#6a9955;--tok-operator:#d4d4d4;--tok-macro:#c586c0;--tok-param:#9cdcfe;--exec-line-bg:rgba(255,255,100,0.12);--exec-gutter-bg:rgba(255,255,100,0.25);--btn-bg:#0e639c;--btn-hover:#1177bb;--btn-text:#ffffff;--btn-secondary:#3a3a3a;--btn-sec-hover:#4a4a4a;--badge-var:#1f3a5f;--badge-text:#9cdcfe;--heap-border:#5a4a2f;--heap-bg:#2a2010;--arr-bg:#1f2d1f;--arr-border:#3a5a3a;--arr-text:#4ec9b0;--ptr-color:#c586c0;--changed-bg:rgba(255,200,0,0.08);--changed-text:#cca700;--wt-border:#007acc;--wt-bg:#032f4e;}
-[data-theme="light"]{--vsc-bg:#ffffff;--vsc-sidebar:#f3f3f3;--vsc-actbar:#2c2c2c;--vsc-panel:#ffffff;--vsc-titlebar:#dddddd;--vsc-input:#ffffff;--vsc-border:#e0e0e0;--vsc-border2:#cccccc;--vsc-hover:#e8e8e8;--vsc-selected:#cce5ff;--vsc-tab-active:#ffffff;--vsc-tab-inactive:#ececec;--vsc-tab-border:#007acc;--vsc-status:#007acc;--vsc-status-text:#ffffff;--vsc-accent:#0066b8;--vsc-accent2:#005a9e;--vsc-green:#267f99;--vsc-green2:#1a8a1a;--vsc-red:#cd3131;--vsc-yellow:#b5890e;--vsc-orange:#875500;--vsc-purple:#af00db;--vsc-blue:#001080;--vsc-blue2:#0000ff;--vsc-cyan:#267f99;--text:#1e1e1e;--text2:#6e6e6e;--text3:#a0a0a0;--text-bright:#000000;--scrollbar:#c0c0c0;--scrollbar-hover:#909090;--tok-keyword:#0000ff;--tok-type:#267f99;--tok-fn:#795e26;--tok-var:#001080;--tok-string:#a31515;--tok-number:#098658;--tok-comment:#008000;--tok-operator:#000000;--tok-macro:#af00db;--tok-param:#001080;--exec-line-bg:rgba(255,224,0,0.25);--exec-gutter-bg:rgba(255,200,0,0.4);--btn-bg:#0066b8;--btn-hover:#005a9e;--btn-text:#ffffff;--btn-secondary:#e0e0e0;--btn-sec-hover:#d0d0d0;--badge-var:#dbeafe;--badge-text:#1d4ed8;--heap-border:#c8a060;--heap-bg:#fff8ec;--arr-bg:#f0fff0;--arr-border:#7cba7c;--arr-text:#267f99;--ptr-color:#af00db;--changed-bg:rgba(255,200,0,0.18);--changed-text:#875500;--wt-border:#0066b8;--wt-bg:#dbeafe;}
+[data-theme="light"]{--vsc-bg:#ffffff;--vsc-sidebar:#f3f3f3;--vsc-actbar:#2c2c2c;--vsc-panel:#ffffff;--vsc-titlebar:#dddddd;--vsc-input:#ffffff;--vsc-border:#e0e0e0;--vsc-border2:#cccccc;--vsc-hover:#e8e8e8;--vsc-selected:#cce5ff;--vsc-tab-active:#ffffff;--vsc-tab-inactive:#ececec;--vsc-tab-border:#007acc;--vsc-status:#007acc;--vsc-status-text:#ffffff;--vsc-accent:#0066b8;--vsc-accent2:#005a9e;--vsc-green:#267f99;--vsc-green2:#1a8a1a;--vsc-red:#cd3131;--vsc-yellow:#b5890e;--vsc-orange:#875500;--vsc-purple:#af00db;--text:#1e1e1e;--text2:#6e6e6e;--text3:#a0a0a0;--text-bright:#000000;--scrollbar:#c0c0c0;--scrollbar-hover:#909090;--tok-keyword:#0000ff;--tok-type:#267f99;--tok-fn:#795e26;--tok-var:#001080;--tok-string:#a31515;--tok-number:#098658;--tok-comment:#008000;--tok-operator:#000000;--tok-macro:#af00db;--tok-param:#001080;--exec-line-bg:rgba(255,224,0,0.25);--exec-gutter-bg:rgba(255,200,0,0.4);--btn-bg:#0066b8;--btn-hover:#005a9e;--btn-text:#ffffff;--btn-secondary:#e0e0e0;--btn-sec-hover:#d0d0d0;--badge-var:#dbeafe;--badge-text:#1d4ed8;--heap-border:#c8a060;--heap-bg:#fff8ec;--arr-bg:#f0fff0;--arr-border:#7cba7c;--arr-text:#267f99;--ptr-color:#af00db;--changed-bg:rgba(255,200,0,0.18);--changed-text:#875500;--wt-border:#0066b8;--wt-bg:#dbeafe;}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
 html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;background:var(--vsc-bg);color:var(--text);font-size: 20px !important; line-height:1.5;-webkit-font-smoothing:antialiased;}
@@ -16,11 +16,10 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
     user-select: none;
     position: relative;
     z-index: 20;
-    overflow-x: auto; /* Enables horizontal scroll */
-    scrollbar-width: none; /* Hides scrollbar in Firefox */
+    overflow-x: auto;
+    scrollbar-width: none;
 }
 
-/* Hide scrollbar for Chrome/Safari/Edge */
 #titlebar::-webkit-scrollbar {
     display: none;
 }
@@ -38,10 +37,9 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
 
 .tb-spacer {
     flex: 1;
-    min-width: 20px; /* Ensures space between items */
+    min-width: 20px;
 }
 
-/* Ensure buttons don't shrink on small screens */
 .tb-btn {
     flex-shrink: 0; 
 }
@@ -64,7 +62,6 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
 .tb-btn:disabled{opacity:.38;cursor:not-allowed;pointer-events:none;}
 .tb-btn i{font-size:13px;}
 
-/* Code editor zoom controls */
 .zoom-group{
     display:flex;
     align-items:center;
@@ -91,14 +88,6 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
     user-select:none;
 }
 
-/* ── Zoom-driven code sizing ──────────────────────────────────────────────
-   --code-font-size / --code-line-height are the single source of truth for
-   editor text size, updated by the inline zoom script in index.html. Every
-   rule below reads from these variables (never hard-codes a px size) so
-   that ALL of CodeMirror's <pre> nodes stay in sync — including the hidden
-   `.CodeMirror-measure` node CodeMirror uses to translate clicks into text
-   offsets. If any one of these nodes falls out of sync with the others,
-   clicking / cursor placement / backspace will target the wrong character. */
 #cm-host{--code-font-size:13.5px;--code-line-height:22px;}
 #cm-host .CodeMirror,
 #cm-host .CodeMirror pre{
@@ -119,12 +108,6 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
 .e-tab.active::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:var(--vsc-tab-border);}
 .e-tab i{font-size:12px;opacity:.7;}
 #cm-host{flex:1;overflow:hidden;position:relative;}
-/* NOTE: font-size/line-height here now read from the same --code-font-size /
-   --code-line-height variables set on #cm-host above, instead of being
-   hard-coded to 13.5px/22px. Two different rules independently hard-coding
-   the same value was exactly what let the zoom script's per-node inline
-   styles (the old, buggy approach) get out of sync with the rest of the
-   editor in the first place — now there's one source of truth. */
 [data-theme="dark"] .CodeMirror{background:#1e1e1e !important;color:#d4d4d4 !important;height:100% !important;font-family:'Fira Code','Cascadia Code','Consolas',monospace !important;font-size:var(--code-font-size,13.5px) !important;line-height:var(--code-line-height,22px) !important;}
 [data-theme="light"] .CodeMirror{background:#ffffff !important;color:#000000 !important;height:100% !important;font-family:'Fira Code','Cascadia Code','Consolas',monospace !important;font-size:var(--code-font-size,13.5px) !important;line-height:var(--code-line-height,22px) !important;}
 .CodeMirror-scroll{overflow:auto !important;}
@@ -210,10 +193,38 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
 .seg-badge.heap{background:rgba(197,134,192,.18);color:var(--ptr-color);}
 .seg-badge.stack{background:rgba(0,122,204,.18);color:var(--vsc-accent);}
 .seg-badge.static{background:rgba(204,167,0,.18);color:var(--vsc-yellow);}
-.arr-row{display:flex;flex-wrap:nowrap;gap:3px;padding:2px 2px 14px;overflow-x:auto;max-width:100%;}
-.arr-cell{position:relative;min-width:34px;padding:3px 5px 12px;background:var(--arr-bg);border:1px solid var(--arr-border);border-radius:3px;text-align:center;color:var(--arr-text);font-size:11.5px;flex-shrink:0;}
-.arr-cell .ac-bin{display:block;font-size:7px;color:var(--text3);margin-top:1px;font-family:'Fira Code',monospace;}
+
+/* ── Array cells: value bars + swap/search highlight states ────────────────
+   .arr-cell is now a flex column so a numeric bar (.ac-bar-track /
+   .ac-bar-fill) can sit between the value and the binary readout, with the
+   fill's pixel height set inline per-cell (proportional to |value| against
+   the array's current max) — this is what makes array "height" reflect
+   value, classic sorting-visualizer style. The four highlight modifiers
+   below are applied by app.js based on what the interpreter's touch log
+   recorded for the current step: a cell just written to (a swap) glows
+   orange; a cell just read gets a neutral blue glow, or — if that read fed
+   a comparison — amber for "compared, no match" and green with a
+   "✓ found" tag for "compared, matched" (e.g. a successful
+   `if (arr[i] == key)` in a search algorithm). */
+.arr-row{display:flex;flex-wrap:nowrap;align-items:flex-end;gap:5px;padding:2px 2px 14px;overflow-x:auto;max-width:100%;}
+.arr-cell{position:relative;min-width:36px;padding:4px 5px 12px;background:var(--arr-bg);border:1px solid var(--arr-border);border-radius:4px;text-align:center;color:var(--arr-text);font-size:11.5px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;transition:background .2s ease,border-color .2s ease,box-shadow .2s ease,transform .15s ease;}
+.arr-cell .ac-val{order:1;font-weight:600;white-space:nowrap;}
+.arr-cell .ac-bar-track{order:2;width:16px;min-height:6px;display:flex;align-items:flex-end;justify-content:center;margin:4px 0 2px;}
+.arr-cell .ac-bar-fill{width:100%;background:linear-gradient(180deg,var(--vsc-accent) 0%,var(--vsc-accent2) 100%);border-radius:2px 2px 0 0;transition:height .3s ease,background .2s ease;}
+.arr-cell .ac-bin{order:3;display:block;font-size:7px;color:var(--text3);margin-top:1px;font-family:'Fira Code',monospace;}
+.arr-cell .ac-idx{order:4;display:block;margin-top:1px;font-size:8px;color:var(--text3);text-align:center;font-family:'Inter',sans-serif;}
 .arr-idx{position:absolute;bottom:1px;left:0;right:0;font-size:8px;color:var(--text3);text-align:center;font-family:'Inter',sans-serif;}
+
+.arr-cell.arr-cell-swap{background:rgba(215,90,40,.18);border-color:var(--vsc-orange);box-shadow:0 0 0 2px rgba(215,120,40,.28);transform:translateY(-2px);}
+.arr-cell.arr-cell-swap .ac-bar-fill{background:linear-gradient(180deg,var(--vsc-orange) 0%,#b85c00 100%);}
+.arr-cell.arr-cell-touch{background:rgba(0,122,204,.14);border-color:var(--vsc-accent);}
+.arr-cell.arr-cell-touch .ac-bar-fill{background:linear-gradient(180deg,var(--vsc-accent) 0%,var(--vsc-accent2) 100%);}
+.arr-cell.arr-cell-compare{background:rgba(204,167,0,.16);border-color:var(--vsc-yellow);}
+.arr-cell.arr-cell-compare .ac-bar-fill{background:linear-gradient(180deg,var(--vsc-yellow) 0%,#a37a00 100%);}
+.arr-cell.arr-cell-match{background:rgba(35,209,139,.2);border-color:var(--vsc-green2);box-shadow:0 0 0 2px rgba(35,209,139,.32);transform:translateY(-2px);}
+.arr-cell.arr-cell-match .ac-bar-fill{background:linear-gradient(180deg,var(--vsc-green2) 0%,#0f7a4f 100%);}
+.arr-cell.arr-cell-match::after{content:'✓ found';position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:8px;font-weight:700;color:var(--vsc-green2);white-space:nowrap;font-family:'Inter',sans-serif;}
+
 .sec-hdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);display:flex;align-items:center;gap:8px;margin:14px 0 8px;}
 .sec-hdr::after{content:'';flex:1;height:1px;background:var(--vsc-border);}
 .heap-block{background:var(--heap-bg);border:1px solid var(--heap-border);border-left:3px solid var(--vsc-orange);border-radius:4px;padding:8px 12px;margin-bottom:6px;font-family:'Fira Code',monospace;font-size:12px;display:flex;flex-direction:column;gap:8px;overflow-x:auto;max-width:100%;}
