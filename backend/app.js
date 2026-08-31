@@ -417,16 +417,19 @@ int main() {
 array:`#include <stdio.h>
 
 int main() {
-    int arr[5] = {10, 20, 30, 40, 50};
-    int sum = 0;
-    int i;
-    for (i = 0; i < 5; i++) {
-        sum += arr[i];
-        printf("arr[%d] = %d\\n", i, arr[i]);
+    int arr[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+
+    for (int i = 0; i < 10; i++) {
+        arr[i] = arr[i] * arr[i];
     }
-    printf("Sum = %d\\n", sum);
+
+    for (int i = 0; i < 10; i++) {
+        printf("%d = %d", i+1, arr[i]);
+    }
+    
     return 0;
 }`,
+    
 "2darray":`#include <stdio.h>  
 int main()
 {
