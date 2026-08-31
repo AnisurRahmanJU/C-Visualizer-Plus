@@ -4180,19 +4180,31 @@ function getTouchesForName(step, name) {
   if (!step || !step.touches || !name) return [];
   return step.touches.filter(t => t.name === name);
 }
-// Finds which local/global pointer variable (if any) currently holds a
-// given heap address, so a heap block's cell touches (recorded against the
-// pointer's *name*, e.g. "heapArr[i]") can be matched back to that block.
-function getPointerNameForAddr(frames, addr) {
-  if (!frames) return null;
+// Finds every local/global pointer variable name that currently holds a
+// given heap address, across every active frame (global scope and any
+// call frames), so a heap block's cell touches — recorded against
+// whichever name the executing code used, e.g. a function parameter
+// (`arr` in `int *arr`) — can be matched back to that block regardless
+// of what name the caller's pointer had (e.g. `heapArr` in main()).
+function getPointerNamesForAddr(frames, addr) {
+  const names = new Set();
+  if (!frames) return names;
   for (const fr of frames) {
     for (const [k, v] of Object.entries(fr.vars || {})) {
-      if (v.value === addr) return k;
+      if (v.value === addr) names.add(k);
     }
   }
-  return null;
+  return names;
 }
-
+// Filters a step's touch log down to the entries for a set of pointer
+// names that currently alias the same heap block (e.g. a caller's
+// `heapArr` and a function parameter `arr` bound to the same address),
+// so a heap block's cells reflect touches made through *any* of its
+// aliases — not just whichever name happens to be found first.
+function getTouchesForNames(step, names) {
+  if (!step || !step.touches || !names || !names.size) return [];
+  return step.touches.filter(t => names.has(t.name));
+}
 function renderStep(idx) {
   const step = interp.steps[idx]; if (!step) return;
   showWalk('', step.desc || '');
@@ -4474,8 +4486,8 @@ function renderHeap(heap, step) {
     } else if (block.arr && block.arr.length) {
       const body = document.createElement('div');
       body.className = 'hb-body';
-      const ptrName = getPointerNameForAddr(frames, addr);
-      const touches = getTouchesForName(step, ptrName);
+      const ptrNames = getPointerNamesForAddr(frames, addr);
+      const touches = getTouchesForNames(step, ptrNames);
       const matchState = getMatchState(step);
       body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar, block.init, touches, matchState);
       d.appendChild(body);
