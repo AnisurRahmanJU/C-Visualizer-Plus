@@ -417,15 +417,15 @@ int main() {
 array:`#include <stdio.h>
 
 int main() {
-    int arr[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    int arr[5] = {1, 2, 3, 4, 5};
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 5; i++) {
         arr[i] = arr[i] * arr[i];
     }
 
-    printf("1 to 10 Number's Square are:\\n");
+    printf("1 to 5 Number's Square are:\\n");
     
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 5; i++) {
         printf("%d -> %d\\n", i+1, arr[i]);
     }
     
