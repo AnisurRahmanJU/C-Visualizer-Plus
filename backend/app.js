@@ -786,7 +786,8 @@ void merge(int arr[], int l, int m, int r) {
         }
     while (j < n2) { 
     arr[k] = R[j]; 
-    j++; k++; 
+    j++; 
+    k++; 
     }
 }
 
@@ -809,11 +810,13 @@ int main() {
     int n = 6;
     printf("Before: ");
     int i;
-    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    for (i = 0; i < n; i++) 
+    printf("%d ", arr[i]);
     printf("\\n");
     mergeSort(arr, 0, n - 1);
     printf("Sorted: ");
-    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    for (i = 0; i < n; i++) 
+    printf("%d ", arr[i]);
     printf("\\n");
     return 0;
 }`,
