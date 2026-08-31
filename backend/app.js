@@ -697,7 +697,8 @@ void selectionSort(int arr[], int n) {
         arr[i] = temp;
         printf("Pass %d: ", i + 1);
         int k;
-        for (k = 0; k < n; k++) printf("%d ", arr[k]);
+        for (k = 0; k < n; k++) 
+        printf("%d ", arr[k]);
         printf("\\n");
     }
 }
@@ -707,11 +708,13 @@ int main() {
     int n = 6;
     printf("Before: ");
     int i;
-    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    for (i = 0; i < n; i++) 
+    printf("%d ", arr[i]);
     printf("\\n");
     selectionSort(arr, n);
     printf("Sorted: ");
-    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    for (i = 0; i < n; i++) 
+    printf("%d ", arr[i]);
     printf("\\n");
     return 0;
 }`,
@@ -729,7 +732,8 @@ void insertionSort(int arr[], int n) {
         arr[j + 1] = key;
         printf("Step %d: ", i);
         int k;
-        for (k = 0; k < n; k++) printf("%d ", arr[k]);
+        for (k = 0; k < n; k++) 
+        printf("%d ", arr[k]);
         printf("\\n");
     }
 }
@@ -739,11 +743,13 @@ int main() {
     int n = 6;
     printf("Before: ");
     int i;
-    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    for (i = 0; i < n; i++) 
+    printf("%d ", arr[i]);
     printf("\\n");
     insertionSort(arr, n);
     printf("Sorted: ");
-    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    for (i = 0; i < n; i++) 
+    printf("%d ", arr[i]);
     printf("\\n");
     return 0;
 }`,
@@ -754,16 +760,34 @@ void merge(int arr[], int l, int m, int r) {
     int n2 = r - m;
     int L[10], R[10];
     int i, j, k;
-    for (i = 0; i < n1; i++) L[i] = arr[l + i];
-    for (j = 0; j < n2; j++) R[j] = arr[m + 1 + j];
+    
+    for (i = 0; i < n1; i++) 
+    L[i] = arr[l + i];
+    
+    for (j = 0; j < n2; j++) 
+    R[j] = arr[m + 1 + j];
+    
     i = 0; j = 0; k = l;
     while (i < n1 && j < n2) {
-        if (L[i] <= R[j]) { arr[k] = L[i]; i++; }
-        else              { arr[k] = R[j]; j++; }
+        if (L[i] <= R[j]) 
+        { 
+           arr[k] = L[i]; 
+           i++; 
+        }
+           else{ 
+           arr[k] = R[j]; 
+           j++; 
+        }
         k++;
     }
-    while (i < n1) { arr[k] = L[i]; i++; k++; }
-    while (j < n2) { arr[k] = R[j]; j++; k++; }
+    while (i < n1) { 
+        arr[k] = L[i]; i++; 
+        k++; 
+        }
+    while (j < n2) { 
+    arr[k] = R[j]; 
+    j++; k++; 
+    }
 }
 
 void mergeSort(int arr[], int l, int r) {
@@ -774,7 +798,8 @@ void mergeSort(int arr[], int l, int r) {
         merge(arr, l, m, r);
         printf("Merged [%d..%d]: ", l, r);
         int i;
-        for (i = l; i <= r; i++) printf("%d ", arr[i]);
+        for (i = l; i <= r; i++) 
+        printf("%d ", arr[i]);
         printf("\\n");
     }
 }
@@ -800,10 +825,14 @@ int partition(int arr[], int low, int high) {
     for (j = low; j < high; j++) {
         if (arr[j] <= pivot) {
             i++;
-            temp = arr[i]; arr[i] = arr[j]; arr[j] = temp;
+            temp = arr[i]; 
+            arr[i] = arr[j]; 
+            arr[j] = temp;
         }
     }
-    temp = arr[i + 1]; arr[i + 1] = arr[high]; arr[high] = temp;
+    temp = arr[i + 1]; 
+    arr[i + 1] = arr[high]; 
+    arr[high] = temp;
     printf("Pivot %d placed at index %d\\n", pivot, i + 1);
     return i + 1;
 }
@@ -821,11 +850,13 @@ int main() {
     int n = 7;
     printf("Before: ");
     int i;
-    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    for (i = 0; i < n; i++) 
+    printf("%d ", arr[i]);
     printf("\\n");
     quickSort(arr, 0, n - 1);
     printf("Sorted: ");
-    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    for (i = 0; i < n; i++) 
+    printf("%d ", arr[i]);
     printf("\\n");
     return 0;
 }`,
