@@ -423,7 +423,7 @@ int main() {
         arr[i] = arr[i] * arr[i];
     }
 
-    printf("1 to 10 number's Square are:\\n");
+    printf("1 to 10 Number's Square are:\\n");
     
     for (int i = 0; i < 10; i++) {
         printf("%d -> %d\\n", i+1, arr[i]);
