@@ -678,7 +678,8 @@ int main() {
     int n = 7;
     printf("Array: ");
     int i;
-    for (i = 0; i < n; i++) printf("%d ", arr[i]);
+    for (i = 0; i < n; i++) 
+    printf("%d ", arr[i]);
     printf("\\nSearching for: %d\\n", key);
     int result = linearSearch(arr, n, key);
     if (result != -1)
