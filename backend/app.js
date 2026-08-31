@@ -3918,6 +3918,43 @@ cmWrapperEl.addEventListener('click', ensureEditorFocused);
   document.head.appendChild(style);
 })();
 
+// Injects styling for a smooth, terminal-style blinking cursor that sits
+// at the end of the Output pane's live text. The blink uses an eased
+// opacity fade (not an abrupt on/off toggle) so it reads as a gentle pulse
+// rather than a harsh flash, and a newline in the program's stdout simply
+// carries the cursor down onto the next visual line since the block sits
+// inline right after the last printed character (including trailing "\n").
+(function injectOutputCursorStyles(){
+  if (document.getElementById('output-cursor-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'output-cursor-styles';
+  style.textContent = `
+    #output-area {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .output-cursor {
+      display: inline-block;
+      width: 0.55em;
+      height: 1.05em;
+      margin-left: 1px;
+      background: currentColor;
+      vertical-align: text-bottom;
+      border-radius: 1px;
+      opacity: 1;
+      animation: output-cursor-blink 1.05s ease-in-out infinite;
+    }
+    @keyframes output-cursor-blink {
+      0%   { opacity: 1;   }
+      45%  { opacity: 1;   }
+      50%  { opacity: 0.08;}
+      95%  { opacity: 0.08;}
+      100% { opacity: 1;   }
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
 let execMark = null;
 
 function extractForClauses(lineText) {
@@ -4048,6 +4085,49 @@ const heapDragLayer = $('heap-drag-layer');
 
 let heapPositions = {};
 
+// ─── Output-pane rendering (with blinking terminal cursor) ──────────────────
+// Escapes text for safe injection into the Output pane's innerHTML.
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// Renders `text` into the Output pane. When there's real program output
+// (text is non-empty), the escaped text is followed immediately by a
+// `.output-cursor` block — a smoothly, gently blinking caret — so the pane
+// reads like a live terminal, and a trailing "\n" in the program's stdout
+// naturally carries that cursor down to the start of the next line since
+// it's simply the next inline character after the newline.
+function setOutputDisplay(text) {
+  const hasOutput = !!(text && text.length);
+  if (!hasOutput) {
+    outputArea.innerHTML = escapeHtml('— no output yet —');
+    return;
+  }
+  outputArea.innerHTML = escapeHtml(text) + '<span class="output-cursor"></span>';
+  outputArea.scrollTop = outputArea.scrollHeight;
+}
+
+// Reads back the raw (un-escaped, cursor-stripped) text currently shown in
+// the Output pane, so callers that need to append to it (e.g. queuing
+// stdin while nothing is running yet) can do so without re-deriving state
+// from the interpreter.
+function getCurrentOutputRaw() {
+  const clone = outputArea.cloneNode(true);
+  const cursor = clone.querySelector('.output-cursor');
+  if (cursor) cursor.remove();
+  const txt = clone.textContent;
+  return txt === '— no output yet —' ? '' : txt;
+}
+
+// Appends raw text to whatever is currently displayed in the Output pane
+// and re-renders it (cursor included).
+function appendOutputRaw(text) {
+  setOutputDisplay(getCurrentOutputRaw() + text);
+}
+
 sampleSel.addEventListener('change', () => {
   const k = sampleSel.value;
   if (k && SAMPLES[k]) { cmEditor.setValue(SAMPLES[k]); resetViz(); }
@@ -4096,7 +4176,7 @@ function sendStdin() {
   const v = stdinIn.value.trim(); if (!v) return;
   stdinQ.push(v);
   stdinIn.value = '';
-  outputArea.textContent += `[stdin queued: ${v}]\n`;
+  appendOutputRaw(`[stdin queued: ${v}]\n`);
 }
 
 runBtn.addEventListener('click', runVisualize);
@@ -4148,7 +4228,7 @@ function resetViz() {
 }
 
 function clearOutput() {
-  outputArea.textContent = '— no output yet —';
+  setOutputDisplay('');
 }
 
 prevBtn.addEventListener('click', stepPrev);
@@ -4249,7 +4329,7 @@ function renderStep(idx) {
   showWalk('', step.desc || '');
   highlightSegment(step);
   sbLine.textContent = step.ln || '—';
-  outputArea.textContent = step.out && step.out.length ? step.out : '— no output yet —';
+  setOutputDisplay(step.out && step.out.length ? step.out : '');
   renderFrames(step.frames, step.chg, step);
   renderHeap(step.heap, step);
   renderCS(step.cs);
