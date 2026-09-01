@@ -2129,12 +2129,13 @@ class CInterpreter {
 
   _tokenize() {
     const src = this.code; this.tokens = []; let i=0, line=1;
+    this._macros = {};
     while(i<src.length){
       if(src[i]==='\n'){line++;i++;continue;}
       if(/\s/.test(src[i])){i++;continue;}
       if(src[i]==='/'&&src[i+1]==='/'){while(i<src.length&&src[i]!=='\n')i++;continue;}
       if(src[i]==='/'&&src[i+1]==='*'){i+=2;while(i<src.length&&!(src[i]==='*'&&src[i+1]==='/')){if(src[i]==='\n')line++;i++;}i+=2;continue;}
-      if(src[i]==='#'){const s=i;while(i<src.length&&src[i]!=='\n')i++;this.tokens.push({t:'pp',v:src.slice(s,i),ln:line});continue;}
+      if(src[i]==='#'){const s=i;while(i<src.length&&src[i]!=='\n')i++;const ppLine=src.slice(s,i);this.tokens.push({t:'pp',v:ppLine,ln:line});this._registerMacro(ppLine,line);continue;}
       if(src[i]==='"'){let s='',j=i+1;while(j<src.length&&src[j]!=='"'){if(src[j]==='\\'&&j+1<src.length){const e=src[j+1];if(e==='n')s+='\n';else if(e==='t')s+='\t';else if(e==='\\')s+='\\';else if(e==='"')s+='"';else if(e==='0')s+='\0';else s+='\\'+e;j+=2;}else{s+=src[j];j++;}}this.tokens.push({t:'str',v:s,ln:line});i=j+1;continue;}
       if(src[i]==="'"){let ch,j=i+1;if(src[j]==='\\'){const e=src[j+1];ch=e==='n'?'\n':e==='t'?'\t':e==='0'?'\0':e==='\\'?'\\':e==="'"?"'":e;j+=2;}else{ch=src[j];j++;}this.tokens.push({t:'char',v:ch,ln:line});i=j+1;continue;}
       if(/[0-9]/.test(src[i])||(src[i]==='.'&&/[0-9]/.test(src[i+1]))){let n='',j=i,f=false;
@@ -2152,7 +2153,119 @@ class CInterpreter {
       this.tokens.push({t:'op',v:src[i],ln:line});i++;
     }
     this._ti=0;
+    this._expandMacros();
   }
+
+  // ─── #define macro support ─────────────────────────────────────────────
+  // Registers a simple object-like macro from a raw preprocessor line, e.g.
+  // "#define MAX 10" or "#define PI 3.14159". Function-like macros
+  // (e.g. "#define SQR(x) ((x)*(x))") are intentionally left untouched —
+  // they are not expanded, but they also won't crash anything since '#'
+  // lines are otherwise ignored by the parser.
+  _registerMacro(ppLine, line) {
+    const fnLike = /^#\s*define\s+[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(ppLine);
+    if (fnLike) return;
+    const m = /^#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)\s*(.*)$/.exec(ppLine);
+    if (!m) return;
+    const name = m[1];
+    let body = (m[2] || '').replace(/\/\/.*$/, '').trim();
+    this._macros[name] = this._tokenizeMacroBody(body, line);
+  }
+
+  // Tokenizes a macro's replacement text using the same lexical rules as
+  // the main tokenizer (numbers, strings, chars, identifiers, operators),
+  // so a macro body like "10", "3.14159", or "(a + b)" produces tokens
+  // that can be spliced directly into the main token stream.
+  _tokenizeMacroBody(str, line) {
+    const toks = [];
+    let i = 0;
+    while (i < str.length) {
+      const c = str[i];
+      if (/\s/.test(c)) { i++; continue; }
+      if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(str[i + 1]))) {
+        let n = '', j = i, f = false;
+        if (str[j] === '0' && (str[j + 1] === 'x' || str[j + 1] === 'X')) {
+          n = '0x'; j += 2;
+          while (j < str.length && /[0-9a-fA-F]/.test(str[j])) n += str[j++];
+          toks.push({ t: 'num', v: parseInt(n, 16), ln: line, isFloat: false });
+          i = j; continue;
+        }
+        while (j < str.length && (/[0-9]/.test(str[j]) || (str[j] === '.' && !f))) {
+          if (str[j] === '.') f = true;
+          n += str[j]; j++;
+        }
+        let hasFloatSuffix = false;
+        if (str[j] === 'f' || str[j] === 'F') { hasFloatSuffix = true; j++; }
+        while (str[j] === 'u' || str[j] === 'U' || str[j] === 'l' || str[j] === 'L') j++;
+        const isFloatLit = f || hasFloatSuffix;
+        toks.push({ t: 'num', v: isFloatLit ? parseFloat(n) : parseInt(n), ln: line, isFloat: isFloatLit });
+        i = j; continue;
+      }
+      if (c === '"') {
+        let s2 = '', j = i + 1;
+        while (j < str.length && str[j] !== '"') {
+          if (str[j] === '\\' && j + 1 < str.length) {
+            const e = str[j + 1];
+            if (e === 'n') s2 += '\n';
+            else if (e === 't') s2 += '\t';
+            else if (e === '\\') s2 += '\\';
+            else if (e === '"') s2 += '"';
+            else s2 += e;
+            j += 2;
+          } else { s2 += str[j]; j++; }
+        }
+        toks.push({ t: 'str', v: s2, ln: line });
+        i = j + 1; continue;
+      }
+      if (c === "'") {
+        let ch, j = i + 1;
+        if (str[j] === '\\') {
+          const e = str[j + 1];
+          ch = e === 'n' ? '\n' : e === 't' ? '\t' : e === '0' ? '\0' : e === '\\' ? '\\' : e === "'" ? "'" : e;
+          j += 2;
+        } else { ch = str[j]; j++; }
+        toks.push({ t: 'char', v: ch, ln: line });
+        i = j + 1; continue;
+      }
+      if (/[a-zA-Z_]/.test(c)) {
+        let id = '', j = i;
+        while (j < str.length && /[a-zA-Z0-9_]/.test(str[j])) { id += str[j]; j++; }
+        toks.push({ t: 'id', v: id, ln: line });
+        i = j; continue;
+      }
+      const two = str.slice(i, i + 2);
+      if (['++', '--', '==', '!=', '<=', '>=', '&&', '||', '->', '+=', '-=', '*=', '/=', '%=', '<<', '>>'].includes(two)) {
+        toks.push({ t: 'op', v: two, ln: line }); i += 2; continue;
+      }
+      toks.push({ t: 'op', v: c, ln: line }); i++;
+    }
+    return toks;
+  }
+
+  // Substitutes every identifier token that matches a registered macro
+  // name with that macro's tokenized replacement text, splicing the
+  // replacement tokens directly into the main token stream in place of
+  // the identifier. Runs iteratively (bounded) so a macro whose body
+  // references another macro still resolves correctly.
+  _expandMacros() {
+    if (!this._macros || !Object.keys(this._macros).length) return;
+    let changed = true, guard = 0;
+    while (changed && guard++ < 10) {
+      changed = false;
+      const out = [];
+      for (const tok of this.tokens) {
+        if (tok.t === 'id' && this._macros[tok.v] !== undefined) {
+          const repl = this._macros[tok.v];
+          for (const rt of repl) out.push({ ...rt, ln: tok.ln });
+          changed = true;
+        } else {
+          out.push(tok);
+        }
+      }
+      this.tokens = out;
+    }
+  }
+
   _pk(o=0){return this.tokens[this._ti+o]||{t:'eof',v:'',ln:0};}
   _nx(){return this.tokens[this._ti++]||{t:'eof',v:'',ln:0};}
   _ex(v){const t=this._nx();if(t.v!==v)throw new Error(`Expected '${v}' got '${t.v}' near line ${t.ln}`);return t;}
