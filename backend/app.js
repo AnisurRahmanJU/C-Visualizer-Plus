@@ -997,7 +997,8 @@ struct Node* newNode(int d) {
 }
 
 struct Node* deleteNode(struct Node *head, int key) {
-    struct Node *temp = head, *prev = NULL;
+    struct Node *temp = head; 
+    struct Node *prev = NULL;
     if (temp != NULL && temp->data == key) {
         head = temp->next;
         free(temp);
@@ -1528,25 +1529,26 @@ variadic_func:`#include <stdio.h>
 #include <stdarg.h>
 
 int sumAll(int count, ...) {
-    va_list args;
-    va_start(args, count);
-    int total = 0, i;
-    for (i = 0; i < count; i++) {
-        int v = va_arg(args, int);
+    int *ptr = (int *)&count + 1;
+    int total = 0;
+ 
+    for (int i = 0; i < count; i++) {
+        int v = ptr[i]; 
         printf("  arg[%d] = %d\\n", i, v);
         total += v;
     }
-    va_end(args);
     return total;
 }
 
-int main() {
+int main(void) {
     printf("sumAll(3, 10,20,30) args:\\n");
     int s = sumAll(3, 10, 20, 30);
     printf("Sum = %d\\n", s);
+    
     printf("sumAll(5, 1,2,3,4,5) args:\\n");
     s = sumAll(5, 1, 2, 3, 4, 5);
     printf("Sum = %d\\n", s);
+    
     return 0;
 }`,
 recursion_tower:`#include <stdio.h>
@@ -1692,28 +1694,46 @@ int main() {
 }`,
 function_ptr:`#include <stdio.h>
 
-typedef int (*operation_func)(int, int);
+#define OP_ADD 0
+#define OP_SUB 1
+#define OP_MUL 2
 
 int add(int a, int b)  { return a + b; }
 int sub(int a, int b)  { return a - b; }
 int mul(int a, int b)  { return a * b; }
 
-void apply(operation_func op, int x, int y, char *name) {
-    printf("%s(%d, %d) = %d\\n", name, x, y, op(x, y));
+int compute(int op_id, int x, int y) {
+    switch(op_id) {
+        case OP_ADD: return add(x, y);
+        case OP_SUB: return sub(x, y);
+        case OP_MUL: return mul(x, y);
+        default:     return 0;
+    }
+}
+
+void apply(int op_id, int x, int y, char *name) {
+    printf("%s(%d, %d) = %d\\n", name, x, y, compute(op_id, x, y));
 }
 
 int main() {
-    operation_func ops[3] = {add, sub, mul};
-    char *names[3] = {"add", "sub", "mul"};
+    int ops[3];
+    char *names[3];
+    int fp;
     int i;
-    for (i = 0; i < 3; i++)
-        apply(ops[i], 10, 3, names[i]);
 
-    operation_func fp;
-    fp = add;
-    printf("\\nDirect call via fp: %d\\n", fp(7, 8));
-    fp = mul;
-    printf("Direct call via fp: %d\\n", fp(7, 8));
+    ops[0] = OP_ADD; ops[1] = OP_SUB; ops[2] = OP_MUL;
+    names[0] = "add"; names[1] = "sub"; names[2] = "mul";
+
+    for (i = 0; i < 3; i++) {
+        apply(ops[i], 10, 3, names[i]);
+    }
+
+    fp = OP_ADD;
+    printf("\\nDirect call via fp: %d\\n", compute(fp, 7, 8));
+    
+    fp = OP_MUL;
+    printf("Direct call via fp: %d\\n", compute(fp, 7, 8));
+    
     return 0;
 }`,
 boolean:`#include <stdio.h>
