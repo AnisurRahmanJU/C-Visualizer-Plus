@@ -1,6 +1,6 @@
-# C Visualizer Plus — Full C Code Examples (50+ Topics)
+# C Visualizer Plus - Full C Code Examples
 
-Below are all the C sample programs, extracted exactly as they appear in the `SAMPLES` list, each under its topic name.
+Below are all the C sample programs, extracted exactly as they appear in the list, each under its topic name.
 
 ---
 
