@@ -2435,5 +2435,3 @@ int main() {
 ```
 
 ---
-
-**Total: 68 C example programs** covering data types, control flow, functions, recursion, arrays (1D/2D), strings, pointers (including double pointers & function pointers), structs, enums/typedefs, dynamic memory (malloc/calloc/realloc/free, 2D malloc), sorting algorithms (bubble/selection/insertion/merge/quick), searching (linear/binary), stacks & queues (array & linked-list based), linked lists (insert/delete), binary search trees, tree traversals, graphs (BFS/DFS), hash tables, dynamic programming (Fibonacci/knapsack), bitwise operations, variadic functions, number base conversion, math library functions, file I/O, memory layout/addresses/sizeof, and boolean logic.
