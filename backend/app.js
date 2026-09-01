@@ -1694,47 +1694,35 @@ int main() {
 }`,
 function_ptr:`#include <stdio.h>
 
-#define OP_ADD 0
-#define OP_SUB 1
-#define OP_MUL 2
-
-int add(int a, int b)  { return a + b; }
-int sub(int a, int b)  { return a - b; }
-int mul(int a, int b)  { return a * b; }
-
-int compute(int op_id, int x, int y) {
-    switch(op_id) {
-        case OP_ADD: return add(x, y);
-        case OP_SUB: return sub(x, y);
-        case OP_MUL: return mul(x, y);
-        default:     return 0;
-    }
-}
-
-void apply(int op_id, int x, int y, char *name) {
-    printf("%s(%d, %d) = %d\\n", name, x, y, compute(op_id, x, y));
-}
+void func_e(int**** e);
+void func_d(int*** d);
+void func_c(int** c);
 
 int main() {
-    int ops[3];
-    char *names[3];
-    int fp;
-    int i;
-
-    ops[0] = OP_ADD; ops[1] = OP_SUB; ops[2] = OP_MUL;
-    names[0] = "add"; names[1] = "sub"; names[2] = "mul";
-
-    for (i = 0; i < 3; i++) {
-        apply(ops[i], 10, 3, names[i]);
-    }
-
-    fp = OP_ADD;
-    printf("\\nDirect call via fp: %d\\n", compute(fp, 7, 8));
+    int a = 10;
+    int* b = &a;
+    int** c = &b;
+    **c = 20;
     
-    fp = OP_MUL;
-    printf("Direct call via fp: %d\\n", compute(fp, 7, 8));
+    int*** d = &c;
+    func_d(d);
     
+    int**** e = &d;
+    func_e(e);
+    
+    printf("Final value of a: %d\\n", a);
     return 0;
+}
+
+void func_e(int**** e) {
+    ****e = 40;
+}
+
+void func_d(int*** d) {
+    ***d = 30;
+    
+    int**** e = &d;
+    func_e(e);
 }`,
 boolean:`#include <stdio.h>
 #include <string.h>
