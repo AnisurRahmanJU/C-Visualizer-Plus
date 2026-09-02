@@ -4052,6 +4052,59 @@ cmWrapperEl.addEventListener('click', ensureEditorFocused);
   document.head.appendChild(style);
 })();
 
+// Injects styling for the "stale cell" cut/cross-line effect: when a cell's
+// old value has just been copied out to a different index in the same
+// array during this step (e.g. `arr[j] = arr[j+1];` in bubble sort), the
+// *source* cell — whose value is now a stale duplicate about to be
+// overwritten — gets a diagonal cut/strike line drawn across its number
+// and its binary digits go faint/struck too, exactly like the "34" crossed
+// out in the reference screenshot. This is purely a visual cue: the actual
+// stored value/bits are left untouched, only their rendering is marked.
+(function injectStaleCellStyles(){
+  if (document.getElementById('stale-cell-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'stale-cell-styles';
+  style.textContent = `
+    .arr-cell.arr-cell-stale {
+      position: relative;
+      opacity: 0.82;
+    }
+    .arr-cell.arr-cell-stale .ac-val {
+      text-decoration: line-through;
+      text-decoration-color: rgba(20,20,20,0.85);
+      text-decoration-thickness: 2px;
+    }
+    .arr-cell.arr-cell-stale .ac-bin {
+      text-decoration: line-through;
+      text-decoration-color: rgba(20,20,20,0.55);
+      opacity: 0.65;
+    }
+    .arr-cell.arr-cell-stale::before {
+      content: '';
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      top: 16px;
+      height: 2px;
+      background: rgba(20,20,20,0.8);
+      transform: rotate(-16deg);
+      transform-origin: center;
+      pointer-events: none;
+      z-index: 3;
+    }
+    [data-theme="dark"] .arr-cell.arr-cell-stale .ac-val {
+      text-decoration-color: rgba(235,235,235,0.9);
+    }
+    [data-theme="dark"] .arr-cell.arr-cell-stale .ac-bin {
+      text-decoration-color: rgba(235,235,235,0.6);
+    }
+    [data-theme="dark"] .arr-cell.arr-cell-stale::before {
+      background: rgba(235,235,235,0.85);
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
 // Injects styling for a smooth, terminal-style blinking cursor that sits
 // at the end of the Output pane's live text. The blink uses an eased
 // opacity fade (not an abrupt on/off toggle) so it reads as a gentle pulse
@@ -4433,6 +4486,29 @@ function getTouchesForName(step, name) {
   if (!step || !step.touches || !name) return [];
   return step.touches.filter(t => t.name === name);
 }
+// Given the touch log for one array (already filtered to that array's
+// variable name via getTouchesForName/getTouchesForNames), works out
+// which indices are "stale": a cell was read this step while some OTHER
+// index in the SAME array was written this step. That's the classic
+// value-copy pattern in bubble/selection/insertion sort — e.g.
+// `arr[j] = arr[j+1];` reads index j+1 and writes index j in one step.
+// The read source (j+1) still visually holds its old value, but that
+// value has now been duplicated elsewhere and is about to be clobbered,
+// so it gets a cut/strike line through the number (and its binary)
+// to flag it as stale — matching the crossed-out "34" in the reference
+// screenshot. A read at the SAME index that was also written is not
+// stale (that's just a normal in-place update, e.g. `arr[j] += 1`).
+function getStaleIndices(touches){
+  const stale = new Set();
+  if(!touches || !touches.length) return stale;
+  const writeIdxs = new Set();
+  touches.forEach(t => { if (t.op === 'write') writeIdxs.add(t.idx); });
+  if (!writeIdxs.size) return stale;
+  touches.forEach(t => {
+    if (t.op === 'read' && !writeIdxs.has(t.idx)) stale.add(t.idx);
+  });
+  return stale;
+}
 // Finds every local/global pointer variable name that currently holds a
 // given heap address, across every active frame (global scope and any
 // call frames), so a heap block's cell touches — recorded against
@@ -4516,10 +4592,16 @@ function segBadge(seg) {
 //    read as part of a false comparison, or green with a "✓ found" badge
 //    ("match") if it was read as part of a comparison that evaluated true
 //    — this lights up the exact cell a search algorithm just checked, and
-//    turns it green the moment `arr[i] == key` succeeds.
-function buildArrCellsHtml(val, type, isChar, initArr, touches, matchState) {
+//    turns it green the moment `arr[i] == key` succeeds;
+//  - draws a diagonal cut/strike line through a cell's number and binary
+//    ("stale") when this same step copied that cell's old value out to a
+//    different index of the same array (see getStaleIndices) — the value
+//    shown is now a duplicate that's about to be overwritten, just like
+//    the crossed-out "34" in the reference screenshot.
+function buildArrCellsHtml(val, type, isChar, initArr, touches, matchState, staleIndices) {
   const charMode = isChar || (type && type.includes('char'));
   touches = touches || [];
+  const stale = staleIndices || new Set();
   const touchByIdx = {};
   touches.forEach(t => {
     // A write always wins over a read for the same index within one step
@@ -4548,6 +4630,7 @@ function buildArrCellsHtml(val, type, isChar, initArr, touches, matchState) {
 
     let cellClass = 'arr-cell';
     const op = touchByIdx[ci];
+    const isStale = stale.has(ci);
     if (op === 'write') {
       cellClass += ' arr-cell-swap';
     } else if (op === 'read') {
@@ -4555,6 +4638,7 @@ function buildArrCellsHtml(val, type, isChar, initArr, touches, matchState) {
       else if (matchState === 'false') cellClass += ' arr-cell-compare';
       else cellClass += ' arr-cell-touch';
     }
+    if (isStale) cellClass += ' arr-cell-stale';
 
     let barHtml = '';
     if (!charMode) {
@@ -4563,7 +4647,7 @@ function buildArrCellsHtml(val, type, isChar, initArr, touches, matchState) {
       barHtml = `<span class="ac-bar-track"><span class="ac-bar-fill" style="height:${h}px"></span></span>`;
     }
 
-    html += `<div class="${cellClass}" title="dec:${num}&#10;bin:${binStr}${isInit?'':'&#10;(uninit)'}">` +
+    html += `<div class="${cellClass}" title="dec:${num}&#10;bin:${binStr}${isInit?'':'&#10;(uninit)'}${isStale?'&#10;(stale — copied elsewhere, about to be overwritten)':''}">` +
       `<span class="ac-val" style="font-size:11px">${String(glyph).replace(/</g,'&lt;')}</span>` +
       barHtml +
       `<span class="ac-bin">${toBinaryHtml(num, charMode ? 'char' : (type || 'int'))}</span>` +
@@ -4625,7 +4709,7 @@ function renderFrames(frames, chg, step) {
             val.forEach((row) => { vhtml += buildArrCellsHtml(row, v.type, false); });
             vhtml += '</div>';
           } else {
-            vhtml = buildArrCellsHtml(val, v.type, v.type && v.type.includes('char'), null, touches, matchState);
+            vhtml = buildArrCellsHtml(val, v.type, v.type && v.type.includes('char'), null, touches, matchState, getStaleIndices(touches));
           }
         } else if (val && typeof val === 'object' && !Array.isArray(val)) {
           vhtml = `<span style="color:var(--text2);font-size:11.5px">{${Object.entries(val).map(([k2,v2])=>`${k2}: ${fieldToDisplay(v2)}`).join(', ')}}</span>`;
@@ -4742,7 +4826,7 @@ function renderHeap(heap, step) {
       const ptrNames = getPointerNamesForAddr(frames, addr);
       const touches = getTouchesForNames(step, ptrNames);
       const matchState = getMatchState(step);
-      body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar, block.init, touches, matchState);
+      body.innerHTML = buildArrCellsHtml(block.arr, block.isChar ? 'char' : 'int', block.isChar, block.init, touches, matchState, getStaleIndices(touches));
       d.appendChild(body);
     }
 
@@ -4791,7 +4875,6 @@ function makeHeapBlockDraggable(el, addr) {
     heapPositions[addr] = { x: nx, y: ny };
     drawArrows();
   });
-
   const endDrag = e => {
     if (!dragging) return;
     dragging = false;
@@ -4816,7 +4899,6 @@ function renderCS(stack) {
     csEl.appendChild(d);
   }
 }
-
 function renderMM(frames, heap) {
   if (!frames) { mmEl.innerHTML = ''; return; }
   const cells = [];
@@ -4842,7 +4924,6 @@ function renderMM(frames, heap) {
   });
   mmEl.innerHTML = ''; mmEl.appendChild(grid);
 }
-
 // ─── Pointer-arrow overlay (Python-Tutor style) ──────────────────────────────
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -4868,7 +4949,6 @@ function drawArrows() {
     const a = el.dataset.cellAddr;
     if (a && targets[a] === undefined) targets[a] = el;
   });
-
   const sources = memColsEl.querySelectorAll('[data-ptr-source="1"]');
   let drawn = 0;
   sources.forEach(src => {
@@ -4895,9 +4975,7 @@ function drawArrows() {
     } else {
       x2 = tr.left + tr.width / 2 - containerRect.left;
       y2 = tr.top - containerRect.top;
-    }
-
-      
+    } 
     const dx = Math.max(36, Math.abs(x2 - x1) * 0.5);
     const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
@@ -4913,8 +4991,6 @@ function drawArrows() {
       
   });
 }
-
-
 function setStatus(type, msg) {
   sbDot.style.color = type === 'ok' ? '#23d18b' : type === 'error' ? '#f48771' : 'rgba(255,255,255,.7)';
   sbTxt.textContent = msg;
