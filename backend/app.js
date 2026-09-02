@@ -1868,22 +1868,33 @@ callby_vr:`#include <stdio.h>
 
 int main() {
 
-    // Call by Value
-    int num1 = 10;
-    int num2 = num1;
-    printf("Call by Value - Changing Number2\\n");
-    printf("Number1 = %d\\n", num1);
-    num2 = 20;
-    printf("Number2 = %d\\nOnly Number2 is changed by own\\n\\n", num2);
-    
-    // Call by Reference
-    int num3 = 10;
-    int *num4 = &num3;
-    printf("Call by Reference - Changing Number3\\n");
-    printf("Number3 = %d\\n", num3);
-    *num4 = 20;
-    printf("Number3 = %d\\nNumber3 is updated by Pointer Number4\\n", num3);
-    printf("Number4 = %d\\nNumber4 is displayed by pointing to Number3\\n", *num4);
+    // Two friends, separated Mojo Cold Drink
+    int a = 500;
+    int b = a;
+
+    printf("Call by Value:\\n");
+    printf("Friend 1: %d ml\\n", a);
+    printf("Friend 2: %d ml\\n", b);
+
+    b = 250;
+
+    printf("Friend 2 drinks 250 ml: %d ml left\\n", b);
+    printf("Friend 1 still has: %d ml\\n", a);
+
+
+    // One friend points to another's Mojo Cold Drink
+    int c = 500;
+    int *d = &c;
+
+    printf("\\nCall by Reference:\\n");
+    printf("Friend 3: %d ml\\n", c);
+    printf("Friend 4 points to Friend 3\\n");
+
+    *d = 250;
+
+    printf("Friend 4 drinks 250 ml: %d ml left\\n", *d);
+    printf("Friend 3 now has: %d ml\\n", c);
+
     return 0;
 }`,
 
