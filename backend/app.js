@@ -2425,6 +2425,7 @@ class CInterpreter {
         if(this._pk().v==='='){this._nx();init2=this._parse2DInit();}
         decls.push({name:nm2,isArr:ia2,arrSize:sz2b,arrSize2:sz2b2,init:init2});
       }
+      this._checkDeclHomogeneous(decls, declLn);
       this._ex(';');
       this._globalDeclTypes = this._globalDeclTypes || {};
       for(const d of decls) {
@@ -2473,9 +2474,22 @@ class CInterpreter {
     if(t.v==='struct'||this._isType(t.v)){
       const save=this._ti;
       try { return this._parseDecl(); }
-      catch(e) { this._ti=save; const e2=this._parseExpr(); this._ex(';'); return{type:'expr',expr:e2,ln:t.ln}; }
+      catch(e) {
+        this._ti=save;
+        const e2=this._parseExpr();
+        if(this._pk().v===','){
+          throw new Error(`Use variable or value of same datatype if you use comma separated elements (line ${t.ln})`);
+        }
+        this._ex(';');
+        return{type:'expr',expr:e2,ln:t.ln};
+      }
     }
-    const e=this._parseExpr();this._ex(';');return{type:'expr',expr:e,ln:t.ln};
+    const e=this._parseExpr();
+    if(this._pk().v===','){
+      throw new Error(`Use variable or value of same datatype if you use comma separated elements (line ${t.ln})`);
+    }
+    this._ex(';');
+    return{type:'expr',expr:e,ln:t.ln};
   }
 
   _parseReturn(){const ln=this._pk().ln;this._ex('return');let v=null;if(this._pk().v!==';')v=this._parseExpr();this._ex(';');return{type:'return',val:v,ln};}
@@ -2525,6 +2539,7 @@ class CInterpreter {
       decls.push({name,isArr:ia,arrSize:as,arrSize2:as2,init,line:ln});
     }while(this._pk().v===',');
     if(!noSemi)this._ex(';');
+    this._checkDeclHomogeneous(decls, ln);
     return{type:'decl',varType:vt,decls,ln};
   }
 
@@ -2734,6 +2749,40 @@ class CInterpreter {
       else if(kind!==k){
         const ln=item.ln||kindLn||0;
         throw new Error(`Use homogeneous data in array line at ${ln}`);
+      }
+    }
+  }
+
+  // ─── Comma-separated declaration type-consistency check ─────────────────
+  // For a single declaration statement that declares multiple comma
+  // separated variables in one line (e.g. `int a = 10, b = 10.22, c = 'A',
+  // d = "Anis";`), C requires every one of those initializers to be a value
+  // of a compatible/same kind for the shared base type. This visualizer
+  // treats a mismatch between the *literal kinds* used across the comma
+  // separated initializers (int vs float vs char vs string) as an error,
+  // matching how a beginner would read `int a, float b, char c;`-style
+  // mistakes (that case already fails earlier, at token level, with an
+  // "Expected ';'" style parser error).
+  //
+  // Notes:
+  //  - Only fires when there are 2+ comma-separated declarators in the
+  //    same statement — a single `int a = 3.14;` is left alone here.
+  //  - Array declarators (`int arr[5] = {..}`) and initializers that are
+  //    not simple literals (variables, expressions, function calls) are
+  //    skipped, since their type can't be reliably inferred just from the
+  //    AST node and shouldn't produce a false positive.
+  _checkDeclHomogeneous(decls, fallbackLn){
+    if(!decls || decls.length<2) return;
+    let kind=null, kindLn=null;
+    for(const d of decls){
+      if(d.isArr) continue;
+      if(!d.init || d.init.type==='arrlit') continue;
+      const k=this._literalKind(d.init);
+      if(k===null) continue;
+      const ln=d.init.ln || d.line || fallbackLn;
+      if(kind===null){ kind=k; kindLn=ln; }
+      else if(kind!==k){
+        throw new Error(`Use assignment of same datatype if you use comma separated elements (line ${ln})`);
       }
     }
   }
@@ -4053,14 +4102,15 @@ cmWrapperEl.addEventListener('click', ensureEditorFocused);
   document.head.appendChild(style);
 })();
 
-// Injects styling for the "stale cell" cut/cross-line effect: when a cell's
-// old value has just been copied out to a different index in the same
-// array during this step (e.g. `arr[j] = arr[j+1];` in bubble sort), the
-// *source* cell — whose value is now a stale duplicate about to be
-// overwritten — gets a diagonal cut/strike line drawn across its number
-// and its binary digits go faint/struck too, exactly like the "34" crossed
-// out in the reference screenshot. This is purely a visual cue: the actual
-// stored value/bits are left untouched, only their rendering is marked.
+// Injects styling for the "stale cell" cut sign: when a cell's old value
+// has just been copied out to a different index in the same array during
+// this step (e.g. `arr[j] = arr[j+1];` in bubble sort), the *source* cell
+// — whose value is now a stale duplicate about to be overwritten — gets a
+// strike-through drawn directly across its number and its binary digits go
+// faint/struck too. This is purely a visual cue: the actual stored
+// value/bits are left untouched, only their rendering is marked. Only a
+// "number cut" (line-through on the digits themselves) is used here — no
+// separate diagonal/angled cut line is drawn across the cell.
 (function injectStaleCellStyles(){
   if (document.getElementById('stale-cell-styles')) return;
   const style = document.createElement('style');
@@ -4080,27 +4130,11 @@ cmWrapperEl.addEventListener('click', ensureEditorFocused);
       text-decoration-color: rgba(20,20,20,0.55);
       opacity: 0.65;
     }
-    .arr-cell.arr-cell-stale::before {
-      content: '';
-      position: absolute;
-      left: 10%;
-      right: 10%;
-      top: 16px;
-      height: 2px;
-      background: rgba(20,20,20,0.8);
-      transform: rotate(-16deg);
-      transform-origin: center;
-      pointer-events: none;
-      z-index: 3;
-    }
     [data-theme="dark"] .arr-cell.arr-cell-stale .ac-val {
       text-decoration-color: rgba(235,235,235,0.9);
     }
     [data-theme="dark"] .arr-cell.arr-cell-stale .ac-bin {
       text-decoration-color: rgba(235,235,235,0.6);
-    }
-    [data-theme="dark"] .arr-cell.arr-cell-stale::before {
-      background: rgba(235,235,235,0.85);
     }
   `;
   document.head.appendChild(style);
@@ -4495,10 +4529,10 @@ function getTouchesForName(step, name) {
 // `arr[j] = arr[j+1];` reads index j+1 and writes index j in one step.
 // The read source (j+1) still visually holds its old value, but that
 // value has now been duplicated elsewhere and is about to be clobbered,
-// so it gets a cut/strike line through the number (and its binary)
-// to flag it as stale — matching the crossed-out "34" in the reference
-// screenshot. A read at the SAME index that was also written is not
-// stale (that's just a normal in-place update, e.g. `arr[j] += 1`).
+// so it gets a number cut (line-through on the digits) to flag it as
+// stale — matching the crossed-out "34" in the reference screenshot. A
+// read at the SAME index that was also written is not stale (that's just
+// a normal in-place update, e.g. `arr[j] += 1`).
 function getStaleIndices(touches){
   const stale = new Set();
   if(!touches || !touches.length) return stale;
@@ -4594,11 +4628,11 @@ function segBadge(seg) {
 //    ("match") if it was read as part of a comparison that evaluated true
 //    — this lights up the exact cell a search algorithm just checked, and
 //    turns it green the moment `arr[i] == key` succeeds;
-//  - draws a diagonal cut/strike line through a cell's number and binary
-//    ("stale") when this same step copied that cell's old value out to a
-//    different index of the same array (see getStaleIndices) — the value
-//    shown is now a duplicate that's about to be overwritten, just like
-//    the crossed-out "34" in the reference screenshot.
+//  - marks a cell "stale" with a number cut (line-through on its digits
+//    and binary) when this same step copied that cell's old value out to
+//    a different index of the same array (see getStaleIndices) — the
+//    value shown is now a duplicate that's about to be overwritten, just
+//    like the crossed-out "34" in the reference screenshot.
 function buildArrCellsHtml(val, type, isChar, initArr, touches, matchState, staleIndices) {
   const charMode = isChar || (type && type.includes('char'));
   touches = touches || [];
