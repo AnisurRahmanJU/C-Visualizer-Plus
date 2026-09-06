@@ -2478,7 +2478,7 @@ class CInterpreter {
         this._ti=save;
         const e2=this._parseExpr();
         if(this._pk().v===','){
-          throw new Error(`Expected ';' or use value with datatype if you want to use comma separated elements (line ${t.ln})`);
+          throw new Error(`Expected ';' but you can use variable or value using comma separation (line ${t.ln})`);
         }
         this._ex(';');
         return{type:'expr',expr:e2,ln:t.ln};
@@ -2486,7 +2486,7 @@ class CInterpreter {
     }
     const e=this._parseExpr();
     if(this._pk().v===','){
-      throw new Error(`Expected ';' or use value with datatype if you want to use comma separated elements (line ${t.ln})`);
+      throw new Error(`Expected ';' but you can use variable or value using comma separation (line ${t.ln})`);
     }
     this._ex(';');
     return{type:'expr',expr:e,ln:t.ln};
