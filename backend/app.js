@@ -2177,11 +2177,6 @@ class CInterpreter {
   }
 
   // ─── #define macro support ─────────────────────────────────────────────
-  // Registers a simple object-like macro from a raw preprocessor line, e.g.
-  // "#define MAX 10" or "#define PI 3.14159". Function-like macros
-  // (e.g. "#define SQR(x) ((x)*(x))") are intentionally left untouched —
-  // they are not expanded, but they also won't crash anything since '#'
-  // lines are otherwise ignored by the parser.
   _registerMacro(ppLine, line) {
     const fnLike = /^#\s*define\s+[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(ppLine);
     if (fnLike) return;
@@ -2192,10 +2187,6 @@ class CInterpreter {
     this._macros[name] = this._tokenizeMacroBody(body, line);
   }
 
-  // Tokenizes a macro's replacement text using the same lexical rules as
-  // the main tokenizer (numbers, strings, chars, identifiers, operators),
-  // so a macro body like "10", "3.14159", or "(a + b)" produces tokens
-  // that can be spliced directly into the main token stream.
   _tokenizeMacroBody(str, line) {
     const toks = [];
     let i = 0;
@@ -2262,11 +2253,6 @@ class CInterpreter {
     return toks;
   }
 
-  // Substitutes every identifier token that matches a registered macro
-  // name with that macro's tokenized replacement text, splicing the
-  // replacement tokens directly into the main token stream in place of
-  // the identifier. Runs iteratively (bounded) so a macro whose body
-  // references another macro still resolves correctly.
   _expandMacros() {
     if (!this._macros || !Object.keys(this._macros).length) return;
     let changed = true, guard = 0;
@@ -2754,23 +2740,6 @@ class CInterpreter {
   }
 
   // ─── Comma-separated declaration type-consistency check ─────────────────
-  // For a single declaration statement that declares multiple comma
-  // separated variables in one line (e.g. `int a = 10, b = 10.22, c = 'A',
-  // d = "Anis";`), C requires every one of those initializers to be a value
-  // of a compatible/same kind for the shared base type. This visualizer
-  // treats a mismatch between the *literal kinds* used across the comma
-  // separated initializers (int vs float vs char vs string) as an error,
-  // matching how a beginner would read `int a, float b, char c;`-style
-  // mistakes (that case already fails earlier, at token level, with an
-  // "Expected ';'" style parser error).
-  //
-  // Notes:
-  //  - Only fires when there are 2+ comma-separated declarators in the
-  //    same statement — a single `int a = 3.14;` is left alone here.
-  //  - Array declarators (`int arr[5] = {..}`) and initializers that are
-  //    not simple literals (variables, expressions, function calls) are
-  //    skipped, since their type can't be reliably inferred just from the
-  //    AST node and shouldn't produce a false positive.
   _checkDeclHomogeneous(decls, fallbackLn){
     if(!decls || decls.length<2) return;
     let kind=null, kindLn=null;
@@ -3225,12 +3194,6 @@ class CInterpreter {
   }
   _exprName(e){ if(!e)return'?'; if(e.type==='id')return e.n; if(e.type==='sub')return this._exprName(e.x); if(e.type==='mem')return this._exprName(e.x); if(e.type==='deref')return this._exprName(e.x); return '?'; }
 
-  // Records an array-subscript touch ({name, idx, op}) so the UI can
-  // highlight the corresponding cell(s) for the current step. `xNode` is
-  // the base-expression AST node of a `sub` (e.g. the `arr` in `arr[j]`);
-  // `_exprName` resolves it down to the underlying variable name the same
-  // way step descriptions already do. Non-numeric indices or unresolved
-  // names are silently skipped (nothing to highlight).
   _recordTouch(xNode, idx, op){
     if(!this._touchLog) this._touchLog=[];
     if(typeof idx!=='number' || !Number.isFinite(idx)) return;
@@ -3381,16 +3344,16 @@ class CInterpreter {
       case 'sub': {
         const arr=this._eval(e.x,frame);const idx=this._eval(e.i,frame);
         this._recordTouch(e.x, idx, 'read');
-        if(Array.isArray(arr))return arr[idx]??0;
+        if(Array.isArray(arr))return arr[idx]!==undefined?arr[idx]:0;
         if(typeof arr==='string'&&this._heap[arr]){const blk=this._heap[arr];return(blk.arr&&blk.arr[idx]!==undefined)?blk.arr[idx]:0;}
         if(typeof arr==='string')return arr.charCodeAt(idx)||0;
         return 0;
       }
-      case 'mem': { const obj=this._eval(e.x,frame); if(obj&&typeof obj==='object'&&!Array.isArray(obj))return obj[e.f]??0; return 0; }
+      case 'mem': { const obj=this._eval(e.x,frame); if(obj&&typeof obj==='object'&&!Array.isArray(obj))return (obj[e.f]!==undefined?obj[e.f]:0); return 0; }
       case 'pmem': {
         const ptr=this._eval(e.x,frame);
-        if(this._heap[ptr])return this._heap[ptr].data[e.f]??0;
-        for(const f of[...this._callStack,this._globalFrame]){if(!f)continue;for(const[k,v]of Object.entries(f.vars)){if(v.addr===ptr&&v.value&&typeof v.value==='object')return v.value[e.f]??0;}}
+        if(this._heap[ptr])return (this._heap[ptr].data[e.f]!==undefined?this._heap[ptr].data[e.f]:0);
+        for(const f of[...this._callStack,this._globalFrame]){if(!f)continue;for(const[k,v]of Object.entries(f.vars)){if(v.addr===ptr&&v.value&&typeof v.value==='object')return (v.value[e.f]!==undefined?v.value[e.f]:0);}}
         return 0;
       }
       case 'call': return this._evalCall(e,frame);
@@ -3484,10 +3447,10 @@ class CInterpreter {
       const ref=this._lval(e.x,frame); const idx=this._eval(e.i,frame);
       if(ref){
         const cur=ref.get();
-        if(Array.isArray(cur))return{get:()=>{this._recordTouch(e.x,idx,'read');return cur[idx]??0;},set:v=>{this._recordTouch(e.x,idx,'write');cur[idx]=v;}};
+        if(Array.isArray(cur))return{get:()=>{this._recordTouch(e.x,idx,'read');return cur[idx]!==undefined?cur[idx]:0;},set:v=>{this._recordTouch(e.x,idx,'write');cur[idx]=v;}};
         if(typeof cur==='string'&&this._heap[cur]){
           const blk=this._heap[cur]; if(!blk.arr)blk.arr=[];
-          return{get:()=>{this._recordTouch(e.x,idx,'read');return blk.arr[idx]??0;},set:v=>{
+          return{get:()=>{this._recordTouch(e.x,idx,'read');return blk.arr[idx]!==undefined?blk.arr[idx]:0;},set:v=>{
             this._recordTouch(e.x,idx,'write');
             blk.arr[idx]=v;
             blk.data[idx]=v;
@@ -3496,10 +3459,10 @@ class CInterpreter {
         }
       }
       const base=this._eval(e.x,frame);
-      if(Array.isArray(base))return{get:()=>{this._recordTouch(e.x,idx,'read');return base[idx]??0;},set:v=>{this._recordTouch(e.x,idx,'write');base[idx]=v;}};
+      if(Array.isArray(base))return{get:()=>{this._recordTouch(e.x,idx,'read');return base[idx]!==undefined?base[idx]:0;},set:v=>{this._recordTouch(e.x,idx,'write');base[idx]=v;}};
       if(typeof base==='string'&&this._heap[base]){
         const blk=this._heap[base]; if(!blk.arr)blk.arr=[];
-        return{get:()=>{this._recordTouch(e.x,idx,'read');return blk.arr[idx]??0;},set:v=>{
+        return{get:()=>{this._recordTouch(e.x,idx,'read');return blk.arr[idx]!==undefined?blk.arr[idx]:0;},set:v=>{
           this._recordTouch(e.x,idx,'write');
           blk.arr[idx]=v;
           blk.data[idx]=v;
@@ -3513,7 +3476,7 @@ class CInterpreter {
       if(this._heap[ptr]){
         const blk=this._heap[ptr];
         if(!blk.arr)blk.arr=[];
-        return{get:()=>blk.arr[0]??0,set:v=>{
+        return{get:()=>blk.arr[0]!==undefined?blk.arr[0]:0,set:v=>{
           blk.arr[0]=v;
           if(blk.init) blk.init[0]=true;
         }};
@@ -3526,12 +3489,12 @@ class CInterpreter {
     if(e.type==='mem'){
       const ref=this._lval(e.x,frame);if(!ref)return null;
       let obj=ref.get();if(!obj||typeof obj!=='object'){obj={};ref.set(obj);}
-      return{get:()=>obj[e.f]??0,set:v=>{obj[e.f]=v;ref.set(obj);}};
+      return{get:()=>(obj[e.f]!==undefined?obj[e.f]:0),set:v=>{obj[e.f]=v;ref.set(obj);}};
     }
     if(e.type==='pmem'){
       const ptr=this._eval(e.x,frame);
-      if(this._heap[ptr])return{get:()=>this._heap[ptr].data[e.f]??0,set:v=>{this._heap[ptr].data[e.f]=v;}};
-      for(const f of[...this._callStack,this._globalFrame]){if(!f)continue;for(const[k,v]of Object.entries(f.vars)){if(v.addr===ptr){if(!v.value||typeof v.value!=='object')v.value={};return{get:()=>v.value[e.f]??0,set:nv=>{v.value[e.f]=nv;v.changed=true;}};}}}
+      if(this._heap[ptr])return{get:()=>(this._heap[ptr].data[e.f]!==undefined?this._heap[ptr].data[e.f]:0),set:v=>{this._heap[ptr].data[e.f]=v;}};
+      for(const f of[...this._callStack,this._globalFrame]){if(!f)continue;for(const[k,v]of Object.entries(f.vars)){if(v.addr===ptr){if(!v.value||typeof v.value!=='object')v.value={};return{get:()=>(v.value[e.f]!==undefined?v.value[e.f]:0),set:nv=>{v.value[e.f]=nv;v.changed=true;}};}}}
     }
     return null;
   }
@@ -3967,14 +3930,9 @@ class CInterpreter {
   }
   _deepCopy(v){ if(Array.isArray(v)) return v.map(x=>this._deepCopy(x)); if(v&&typeof v==='object') return {...v}; return v; }
   _snapHeap(){const h={};for(const[k,v]of Object.entries(this._heap))h[k]={size:v.size,data:{...v.data},arr:v.arr?v.arr.slice():[],isChar:!!v.isChar,init:v.init?v.init.slice():[]};return h;}
-  // Raised from 800 -> 5000 so that naive/exponential recursion (e.g. an
-  // un-memoized recursive Fibonacci) can still be stepped through in full
-  // for the input sizes a learner would realistically try, instead of the
-  // trace silently stopping partway through.
-  //
-  // Also attaches (and clears) the `touches` array recorded via
-  // `_recordTouch` during this step's evaluation, so the UI can highlight
-  // exactly which array cell(s) were just read/written/compared.
+  // Hard cap on total recorded steps (safety net against runaway/infinite
+  // loops). With the NULL-comparison fix above, well-formed programs never
+  // hit this in practice — it only protects against genuinely broken code.
   _addStep(s){
     s.touches = this._touchLog ? this._touchLog.splice(0) : [];
     if(this.steps.length<5000)this.steps.push(s);
@@ -4102,15 +4060,6 @@ cmWrapperEl.addEventListener('click', ensureEditorFocused);
   document.head.appendChild(style);
 })();
 
-// Injects styling for the "stale cell" cut sign: when a cell's old value
-// has just been copied out to a different index in the same array during
-// this step (e.g. `arr[j] = arr[j+1];` in bubble sort), the *source* cell
-// — whose value is now a stale duplicate about to be overwritten — gets a
-// strike-through drawn directly across its number and its binary digits go
-// faint/struck too. This is purely a visual cue: the actual stored
-// value/bits are left untouched, only their rendering is marked. Only a
-// "number cut" (line-through on the digits themselves) is used here — no
-// separate diagonal/angled cut line is drawn across the cell.
 (function injectStaleCellStyles(){
   if (document.getElementById('stale-cell-styles')) return;
   const style = document.createElement('style');
@@ -4140,12 +4089,6 @@ cmWrapperEl.addEventListener('click', ensureEditorFocused);
   document.head.appendChild(style);
 })();
 
-// Injects styling for a smooth, terminal-style blinking cursor that sits
-// at the end of the Output pane's live text. The blink uses an eased
-// opacity fade (not an abrupt on/off toggle) so it reads as a gentle pulse
-// rather than a harsh flash, and a newline in the program's stdout simply
-// carries the cursor down onto the next visual line since the block sits
-// inline right after the last printed character (including trailing "\n").
 (function injectOutputCursorStyles(){
   if (document.getElementById('output-cursor-styles')) return;
   const style = document.createElement('style');
@@ -4307,8 +4250,6 @@ const heapDragLayer = $('heap-drag-layer');
 
 let heapPositions = {};
 
-// ─── Output-pane rendering (with blinking terminal cursor) ──────────────────
-// Escapes text for safe injection into the Output pane's innerHTML.
 function escapeHtml(s) {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -4316,12 +4257,6 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
-// Renders `text` into the Output pane. When there's real program output
-// (text is non-empty), the escaped text is followed immediately by a
-// `.output-cursor` block — a smoothly, gently blinking caret — so the pane
-// reads like a live terminal, and a trailing "\n" in the program's stdout
-// naturally carries that cursor down to the start of the next line since
-// it's simply the next inline character after the newline.
 function setOutputDisplay(text) {
   const hasOutput = !!(text && text.length);
   if (!hasOutput) {
@@ -4332,10 +4267,6 @@ function setOutputDisplay(text) {
   outputArea.scrollTop = outputArea.scrollHeight;
 }
 
-// Reads back the raw (un-escaped, cursor-stripped) text currently shown in
-// the Output pane, so callers that need to append to it (e.g. queuing
-// stdin while nothing is running yet) can do so without re-deriving state
-// from the interpreter.
 function getCurrentOutputRaw() {
   const clone = outputArea.cloneNode(true);
   const cursor = clone.querySelector('.output-cursor');
@@ -4344,8 +4275,6 @@ function getCurrentOutputRaw() {
   return txt === '— no output yet —' ? '' : txt;
 }
 
-// Appends raw text to whatever is currently displayed in the Output pane
-// and re-renders it (cursor included).
 function appendOutputRaw(text) {
   setOutputDisplay(getCurrentOutputRaw() + text);
 }
@@ -4502,37 +4431,16 @@ document.addEventListener('keydown', e => {
   if (e.key === 'F5') { e.preventDefault(); runVisualize(); }
 });
 
-// Derives the current comparison state from a step's own description,
-// but only for `if`/`while`/`do`/`switch` condition steps (`part ===
-// 'cond-paren'`). Used to decide whether a just-read array cell should
-// glow green ("match" — e.g. `if (arr[mid] == target)` was true) or amber
-// ("compare" — the condition was false), so a search algorithm's progress
-// is visible cell-by-cell as it steps through the array.
 function getMatchState(step) {
   if (!step || step.part !== 'cond-paren') return null;
   if (/\btrue\b/i.test(step.desc || '')) return 'true';
   if (/\bfalse\b/i.test(step.desc || '')) return 'false';
   return null;
 }
-// Filters a step's touch log down to the entries for one variable name
-// (e.g. "arr"), so each array's own cells only reflect touches made
-// through that same variable.
 function getTouchesForName(step, name) {
   if (!step || !step.touches || !name) return [];
   return step.touches.filter(t => t.name === name);
 }
-// Given the touch log for one array (already filtered to that array's
-// variable name via getTouchesForName/getTouchesForNames), works out
-// which indices are "stale": a cell was read this step while some OTHER
-// index in the SAME array was written this step. That's the classic
-// value-copy pattern in bubble/selection/insertion sort — e.g.
-// `arr[j] = arr[j+1];` reads index j+1 and writes index j in one step.
-// The read source (j+1) still visually holds its old value, but that
-// value has now been duplicated elsewhere and is about to be clobbered,
-// so it gets a number cut (line-through on the digits) to flag it as
-// stale — matching the crossed-out "34" in the reference screenshot. A
-// read at the SAME index that was also written is not stale (that's just
-// a normal in-place update, e.g. `arr[j] += 1`).
 function getStaleIndices(touches){
   const stale = new Set();
   if(!touches || !touches.length) return stale;
@@ -4544,12 +4452,6 @@ function getStaleIndices(touches){
   });
   return stale;
 }
-// Finds every local/global pointer variable name that currently holds a
-// given heap address, across every active frame (global scope and any
-// call frames), so a heap block's cell touches — recorded against
-// whichever name the executing code used, e.g. a function parameter
-// (`arr` in `int *arr`) — can be matched back to that block regardless
-// of what name the caller's pointer had (e.g. `heapArr` in main()).
 function getPointerNamesForAddr(frames, addr) {
   const names = new Set();
   if (!frames) return names;
@@ -4560,11 +4462,6 @@ function getPointerNamesForAddr(frames, addr) {
   }
   return names;
 }
-// Filters a step's touch log down to the entries for a set of pointer
-// names that currently alias the same heap block (e.g. a caller's
-// `heapArr` and a function parameter `arr` bound to the same address),
-// so a heap block's cells reflect touches made through *any* of its
-// aliases — not just whichever name happens to be found first.
 function getTouchesForNames(step, names) {
   if (!step || !step.touches || !names || !names.size) return [];
   return step.touches.filter(t => names.has(t.name));
@@ -4613,34 +4510,12 @@ function segBadge(seg) {
   return `<span class="seg-badge ${seg}">${labels[seg] || seg}</span>`;
 }
 
-// Renders one row of array cells. Beyond the existing decimal/binary/index
-// display, this now also:
-//  - draws a value-proportional vertical bar under each numeric (non-char)
-//    cell, scaled against the largest |value| currently in the array — the
-//    classic "sorting visualizer" bar-chart look, so array height reflects
-//    value;
-//  - colors a cell orange ("swap") if it was just written to in the
-//    current step (e.g. the two cells a bubble/selection/insertion sort
-//    just swapped);
-//  - colors a cell blue ("touch") if it was just read in the current step
-//    with no associated comparison result yet, amber ("compare") if it was
-//    read as part of a false comparison, or green with a "✓ found" badge
-//    ("match") if it was read as part of a comparison that evaluated true
-//    — this lights up the exact cell a search algorithm just checked, and
-//    turns it green the moment `arr[i] == key` succeeds;
-//  - marks a cell "stale" with a number cut (line-through on its digits
-//    and binary) when this same step copied that cell's old value out to
-//    a different index of the same array (see getStaleIndices) — the
-//    value shown is now a duplicate that's about to be overwritten, just
-//    like the crossed-out "34" in the reference screenshot.
 function buildArrCellsHtml(val, type, isChar, initArr, touches, matchState, staleIndices) {
   const charMode = isChar || (type && type.includes('char'));
   touches = touches || [];
   const stale = staleIndices || new Set();
   const touchByIdx = {};
   touches.forEach(t => {
-    // A write always wins over a read for the same index within one step
-    // (e.g. `arr[j] = arr[j+1]` both reads j+1 and writes j in one step).
     if (touchByIdx[t.idx] !== 'write') touchByIdx[t.idx] = t.op;
   });
 
