@@ -984,7 +984,7 @@ int main() {
     printList(head);
     return 0;
 }`,
-linked_list_delete:`#include <stdio.h>
+linked_list_insert_delete:`#include <stdio.h>
 #include <stdlib.h>
 
 // Create a node
