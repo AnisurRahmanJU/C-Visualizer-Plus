@@ -877,13 +877,19 @@ int stack[MAX];
 int top = -1;
 
 void push(int val) {
-    if (top >= MAX - 1) { printf("Stack overflow!\\n"); return; }
+    if (top >= MAX - 1) { 
+    printf("Stack overflow!\\n"); 
+    return; 
+    }
     stack[++top] = val;
     printf("Pushed %d  (top=%d)\\n", val, top);
 }
 
 int pop() {
-    if (top < 0) { printf("Stack underflow!\\n"); return -1; }
+    if (top < 0) { 
+    printf("Stack underflow!\\n"); 
+    return -1; 
+    }
     int v = stack[top--];
     printf("Popped %d  (top=%d)\\n", v, top);
     return v;
@@ -911,7 +917,10 @@ int queue[MAX];
 int front = 0, rear = -1, size = 0;
 
 void enqueue(int val) {
-    if (size >= MAX) { printf("Queue full!\\n"); return; }
+    if (size >= MAX) { 
+    printf("Queue full!\\n"); 
+    return; 
+    }
     rear = (rear + 1) % MAX;
     queue[rear] = val;
     size++;
@@ -919,7 +928,10 @@ void enqueue(int val) {
 }
 
 int dequeue() {
-    if (size == 0) { printf("Queue empty!\\n"); return -1; }
+    if (size == 0) { 
+    printf("Queue empty!\\n"); 
+    return -1; 
+    }
     int v = queue[front];
     front = (front + 1) % MAX;
     size--;
@@ -1135,6 +1147,7 @@ int main() {
   printf("\\nSorted List: ");
   printList(head);
 }`,
+    
 stack_linked_list:`#include <stdio.h>
 #include <stdlib.h>
 
@@ -1151,7 +1164,10 @@ void push(int val) {
 }
 
 int pop() {
-    if (!top) { printf("Underflow\\n"); return -1; }
+    if (!top) { 
+    printf("Underflow\\n"); 
+    return -1; 
+    }
     int v = top->data;
     struct Node *t = top;
     top = top->next;
@@ -1160,7 +1176,9 @@ int pop() {
     return v;
 }
 
-int peek() { return top ? top->data : -1; }
+int peek() { 
+return top ? top->data : -1; 
+}
 
 int main() {
     push(5);
@@ -1177,7 +1195,9 @@ int main() {
 queue_linked_list:`#include <stdio.h>
 #include <stdlib.h>
 
-struct Node { int data; struct Node *next; };
+struct Node { 
+int data; struct Node *next; 
+};
 struct Node *front = NULL; *rear = NULL;
 
 void enqueue(int val) {
@@ -1189,7 +1209,10 @@ void enqueue(int val) {
 }
 
 int dequeue() {
-    if (!front) { printf("Empty\\n"); return -1; }
+    if (!front) { 
+    printf("Empty\\n"); 
+    return -1; 
+    }
     int v = front->data;
     struct Node *t = front;
     front = front->next;
@@ -1220,11 +1243,16 @@ struct Node {
 
 struct Node* newNode(int d) {
     struct Node *n = (struct Node*)malloc(sizeof(struct Node));
-    n->data = d; n->left = n->right = NULL; return n;
+    n->data = d; 
+    n->left = n->right = NULL; 
+    return n;
 }
 
 struct Node* insert(struct Node *root, int d) {
-    if (!root) { printf("Insert %d as new node\\n", d); return newNode(d); }
+    if (!root) { 
+    printf("Insert %d as new node\\n", d); 
+    return newNode(d); 
+    }
     if (d < root->data) {
         printf("Go left  from %d\\n", root->data);
         root->left  = insert(root->left,  d);
@@ -1279,18 +1307,27 @@ struct Node* insert(struct Node *root, int d) {
 }
 
 int search(struct Node *root, int key) {
-    if (!root) { printf("Not found\\n"); return 0; }
+    if (!root) { 
+    printf("Not found\\n"); 
+    return 0; 
+    }
     printf("Visiting %d\\n", root->data);
-    if (root->data == key) { printf("Found %d!\\n", key); return 1; }
-    if (key < root->data)  return search(root->left,  key);
-    else                   return search(root->right, key);
+    if (root->data == key) {
+    printf("Found %d!\\n", key); 
+    return 1; 
+    }
+    if (key < root->data)  
+        return search(root->left,  key);
+    else 
+        return search(root->right, key);
 }
 
 int main() {
     struct Node *root = NULL;
     int vals[7] = {50, 30, 70, 20, 40, 60, 80};
     int i;
-    for (i = 0; i < 7; i++) root = insert(root, vals[i]);
+    for (i = 0; i < 7; i++) 
+    root = insert(root, vals[i]);
     printf("Search 40:\\n");
     search(root, 40);
     printf("Search 99:\\n");
@@ -1307,12 +1344,34 @@ struct Node {
 
 struct Node* newNode(int d) {
     struct Node *n = (struct Node*)malloc(sizeof(struct Node));
-    n->data = d; n->left = n->right = NULL; return n;
+    n->data = d; 
+    n->left = n->right = NULL; 
+    return n;
 }
 
-void inorder(struct Node *r)  { if(!r) return; inorder(r->left);  printf("%d ", r->data); inorder(r->right); }
-void preorder(struct Node *r) { if(!r) return; printf("%d ", r->data); preorder(r->left);  preorder(r->right); }
-void postorder(struct Node *r){ if(!r) return; postorder(r->left); postorder(r->right); printf("%d ", r->data); }
+void inorder(struct Node *r)  { 
+if(!r) 
+return; 
+inorder(r->left); 
+printf("%d ", r->data); 
+inorder(r->right); 
+}
+
+void preorder(struct Node *r) { 
+if(!r) 
+return; 
+printf("%d ", r->data); 
+preorder(r->left);  
+preorder(r->right); 
+}
+
+void postorder(struct Node *r){ 
+if(!r) 
+return; 
+postorder(r->left); 
+postorder(r->right); 
+printf("%d ", r->data); 
+}
 
 int main() {
     struct Node *root = newNode(1);
@@ -1322,9 +1381,12 @@ int main() {
     root->left->right = newNode(5);
     root->right->left = newNode(6);
     root->right->right= newNode(7);
-    printf("Inorder   (L Root R): "); inorder(root);   printf("\\n");
-    printf("Preorder  (Root L R): "); preorder(root);  printf("\\n");
-    printf("Postorder (L R Root): "); postorder(root); printf("\\n");
+    printf("Inorder   (L Root R): "); 
+    inorder(root);   printf("\\n");
+    printf("Preorder  (Root L R): "); 
+    preorder(root);  printf("\\n");
+    printf("Postorder (L R Root): "); 
+    postorder(root); printf("\\n");
     return 0;
 }`,
 graph_bfs:`#include <stdio.h>
@@ -1335,16 +1397,25 @@ int visited[V];
 int queue[V];
 int qFront = 0, qRear = -1, qSize = 0;
 
-void enqueue(int v) { queue[++qRear] = v; qSize++; }
-int  dequeue()      { qSize--; return queue[qFront++]; }
+void enqueue(int v) { 
+queue[++qRear] = v; qSize++; 
+}
 
-void addEdge(int u, int v) { adj[u][v] = 1; adj[v][u] = 1; }
+int  dequeue() { 
+qSize--; return queue[qFront++];
+}
+
+void addEdge(int u, int v) { 
+adj[u][v] = 1; adj[v][u] = 1; 
+}
 
 void bfs(int start) {
     int i;
-    for (i = 0; i < V; i++) visited[i] = 0;
+    for (i = 0; i < V; i++) 
+    visited[i] = 0;
     visited[start] = 1;
     enqueue(start);
+    
     printf("BFS from %d: ", start);
     while (qSize > 0) {
         int node = dequeue();
@@ -1362,20 +1433,27 @@ void bfs(int start) {
 int main() {
     int i, j;
     for (i = 0; i < V; i++)
-        for (j = 0; j < V; j++) adj[i][j] = 0;
-    addEdge(0, 1); addEdge(0, 2);
-    addEdge(1, 3); addEdge(1, 4);
+        for (j = 0; j < V; j++) 
+        adj[i][j] = 0;
+    addEdge(0, 1); 
+    addEdge(0, 2);
+    addEdge(1, 3); 
+    addEdge(1, 4);
     addEdge(2, 5);
     bfs(0);
     return 0;
 }`,
+    
 graph_dfs:`#include <stdio.h>
 #define V 6
 
 int adj[V][V];
 int visited[V];
 
-void addEdge(int u, int v) { adj[u][v] = 1; adj[v][u] = 1; }
+void addEdge(int u, int v) {
+adj[u][v] = 1; 
+adj[v][u] = 1; 
+}
 
 void dfs(int node) {
     visited[node] = 1;
@@ -1389,10 +1467,15 @@ void dfs(int node) {
 
 int main() {
     int i, j;
-    for (i = 0; i < V; i++) for (j = 0; j < V; j++) adj[i][j] = 0;
-    for (i = 0; i < V; i++) visited[i] = 0;
-    addEdge(0, 1); addEdge(0, 2);
-    addEdge(1, 3); addEdge(1, 4);
+    for (i = 0; i < V; i++) 
+    for (j = 0; j < V; j++) 
+    adj[i][j] = 0;
+    for (i = 0; i < V; i++) 
+    visited[i] = 0;
+    addEdge(0, 1); 
+    addEdge(0, 2);
+    addEdge(1, 3); 
+    addEdge(1, 4);
     addEdge(2, 5);
     printf("DFS from 0: ");
     dfs(0);
@@ -1404,15 +1487,25 @@ hash_table:`#include <stdio.h>
 
 int hashTable[SIZE];
 
-void init() { int i; for(i=0;i<SIZE;i++) hashTable[i] = -1; }
-int  hash(int key) { return key % SIZE; }
+void init() { 
+int i; 
+for(i=0;i<SIZE;i++)
+hashTable[i] = -1; 
+}
+
+int  hash(int key) { 
+return key % SIZE; 
+}
 
 void insert(int key) {
     int idx = hash(key);
     int start = idx;
     while (hashTable[idx] != -1) {
         idx = (idx + 1) % SIZE;
-        if (idx == start) { printf("Table full!\\n"); return; }
+        if (idx == start) { 
+        printf("Table full!\\n"); 
+        return; 
+        }
     }
     hashTable[idx] = key;
     printf("Insert %d at index %d\\n", key, idx);
@@ -1422,9 +1515,13 @@ int search(int key) {
     int idx = hash(key);
     int start = idx;
     while (hashTable[idx] != -1) {
-        if (hashTable[idx] == key) { printf("Found %d at index %d\\n", key, idx); return idx; }
+        if (hashTable[idx] == key) { 
+        printf("Found %d at index %d\\n", key, idx); 
+        return idx; 
+        }
         idx = (idx + 1) % SIZE;
-        if (idx == start) break;
+        if (idx == start) 
+        break;
     }
     printf("%d not found\\n", key);
     return -1;
@@ -1438,7 +1535,8 @@ int main() {
     search(7);
     int i;
     printf("Table: ");
-    for (i = 0; i < SIZE; i++) printf("[%d]=%d ", i, hashTable[i]);
+    for (i = 0; i < SIZE; i++) 
+    printf("[%d]=%d ", i, hashTable[i]);
     printf("\\n");
     return 0;
 }`,
@@ -1746,7 +1844,9 @@ int main() {
     int i, w;
     for (i = 0; i <= ITEMS; i++) {
         for (w = 0; w <= CAP; w++) {
-            if (i == 0 || w == 0) { dp[i][w] = 0; continue; }
+            if (i == 0 || w == 0) { 
+            dp[i][w] = 0; continue; 
+            }
             if (weight[i-1] <= w) {
                 int take = value[i-1] + dp[i-1][w - weight[i-1]];
                 int skip = dp[i-1][w];
@@ -1758,25 +1858,37 @@ int main() {
     }
     printf("Max value (capacity=%d): %d\\n", CAP, dp[ITEMS][CAP]);
     printf("DP table last row: ");
-    for (w = 0; w <= CAP; w++) printf("%d ", dp[ITEMS][w]);
+    for (w = 0; w <= CAP; w++) 
+    printf("%d ", dp[ITEMS][w]);
     printf("\\n");
     return 0;
 }`,
 number_base:`#include <stdio.h>
 
 void decToBin(int n) {
-    if (n == 0) { printf("0"); return; }
-    char buf[33]; int i = 0;
-    while (n > 0) { buf[i++] = '0' + (n % 2); n /= 2; }
-    int j; for (j = i-1; j >= 0; j--) printf("%c", buf[j]);
+    if (n == 0) { 
+    printf("0"); return; }
+    char buf[33]; 
+    int i = 0;
+    while (n > 0) { 
+    buf[i++] = '0' + (n % 2); n /= 2; 
+    }
+    int j; 
+    for (j = i-1; j >= 0; j--) 
+    printf("%c", buf[j]);
 }
 
 void decToHex(int n) {
-    if (n == 0) { printf("0"); return; }
+    if (n == 0) { 
+    printf("0"); return; }
     char hex[] = "0123456789ABCDEF";
     char buf[20]; int i = 0;
-    while (n > 0) { buf[i++] = hex[n % 16]; n /= 16; }
-    int j; for (j = i-1; j >= 0; j--) printf("%c", buf[j]);
+    while (n > 0) { 
+    buf[i++] = hex[n % 16]; n /= 16; 
+    }
+    int j; 
+    for (j = i-1; j >= 0; j--) 
+    printf("%c", buf[j]);
 }
 
 int main() {
@@ -2061,18 +2173,21 @@ struct Point g_point = {7, 9};
 int main() {
     int i, j;
     printf("g_int_arr: ");
-    for (i = 0; i < 5; i++) printf("%d ", g_int_arr[i]);
+    for (i = 0; i < 5; i++) 
+    printf("%d ", g_int_arr[i]);
     printf("\\n");
 
     printf("g_char_arr: ");
-    for (i = 0; i < 4; i++) printf("%c", g_char_arr[i]);
+    for (i = 0; i < 4; i++) 
+    printf("%c", g_char_arr[i]);
     printf("\\n");
 
     printf("g_char_str: %s\\n", g_char_str);
 
     printf("g_grid:\\n");
     for (i = 0; i < 2; i++) {
-        for (j = 0; j < 3; j++) printf("%d ", g_grid[i][j]);
+        for (j = 0; j < 3; j++) 
+        printf("%d ", g_grid[i][j]);
         printf("\\n");
     }
 
