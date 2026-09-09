@@ -2158,7 +2158,7 @@ int main() {
 global_var:`#include <stdio.h>
 
 int   g_int_arr[5]      = {1, 2, 3, 4, 5};
-char  g_char_arr[10]    = {'A', 'n', 'i', 's'};
+char  g_char_arr[10]    = {'A', 'n', 'i', 's', 'u', 'r'};
 char  g_char_str[10]    = "Anisur";
 int   g_grid[2][3]      = {{1, 2, 3}, {4, 5, 6}};
 float g_float_arr[3]    = {1.5f, 2.5f, 3.5f};
