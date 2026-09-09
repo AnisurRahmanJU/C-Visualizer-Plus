@@ -2178,7 +2178,7 @@ int main() {
     printf("\\n");
 
     printf("g_char_arr: ");
-    for (i = 0; i < 4; i++) 
+    for (i = 0; i < 6; i++) 
     printf("%c", g_char_arr[i]);
     printf("\\n");
 
