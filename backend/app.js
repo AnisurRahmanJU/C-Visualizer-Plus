@@ -2155,7 +2155,7 @@ int main() {
     return 0;
 }`,
 
-global_arrays_demo:`#include <stdio.h>
+global_var:`#include <stdio.h>
 
 int   g_int_arr[5]      = {1, 2, 3, 4, 5};
 char  g_char_arr[10]    = {'A', 'n', 'i', 's'};
