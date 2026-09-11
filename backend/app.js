@@ -1936,6 +1936,37 @@ void func_d(int*** d) {
     int**** e = &d;
     func_e(e);
 }`,
+
+pointer_each:`#include <stdio.h>
+
+int main() {
+    char *f1_name = "Anis";
+    char *f1_job  = "Software Engineer";
+    char **f1_ptr_name;
+    char **f1_ptr_job;
+
+    char *f2_name = "Abdullah";
+    char *f2_job  = "Data Scientist";
+    char **f2_ptr_name;
+    char **f2_ptr_job;
+
+    f1_ptr_name = &f2_name;
+    f1_ptr_job  = &f2_job;
+
+    f2_ptr_name = &f1_name;
+    f2_ptr_job  = &f1_job;
+
+    printf("Friend 1 printing Friend 2's info\\n");
+    printf("Name: %s\\n", *f1_ptr_name);
+    printf("Occupation: %s\n\n", *f1_ptr_job);
+
+    printf("Friend 2 printing Friend 1's info\\n");
+    printf("Name: %s\\n", *f2_ptr_name);
+    printf("Occupation: %s\\n", *f2_ptr_job);
+
+    return 0;
+}`,
+    
 boolean:`#include <stdio.h>
 #include <string.h>
 
