@@ -2354,7 +2354,17 @@ class CInterpreter {
     // search match while stepping through the trace (see _recordTouch,
     // and _addStep which snapshots + clears this into each step object).
     this._touchLog = [];
-    try { this._tokenize(); this._buildAST(); this._initGlobals(); this._run(); }
+    // ─── Memoization support for pure recursive functions ─────────────────
+    // Cuts down redundant step generation: once a pure function (no I/O,
+    // no globals, no pointers/arrays touched) has been evaluated for a
+    // given set of scalar arguments, later calls with the same arguments
+    // reuse the cached result instead of re-walking the whole call tree
+    // again (e.g. fib(2) inside fib(4) and fib(3) is only computed once).
+    // The call itself is still recorded as a step — nothing is hidden,
+    // only the repeated internal recursion is skipped.
+    this._memoCache = {};
+    this._pureFunctions = new Set();
+    try { this._tokenize(); this._buildAST(); this._analyzeFunctionPurity(); this._initGlobals(); this._run(); }
     catch(e) { this.errors.push(e.message || String(e)); }
   }
 
@@ -3230,6 +3240,78 @@ class CInterpreter {
     }
   }
 
+  // ─── Purity analysis for memoization ───────────────────────────────────
+  // A function is treated as "pure" (safe to memoize) only if:
+  //  - every parameter is a plain scalar (no arrays, no pointers, no ...)
+  //  - its body never calls an I/O / allocation / random function
+  //  - its body never reads a global variable
+  //  - its body never takes an address (&) or dereferences a pointer (*)
+  //  - it never declares a static local
+  // This is intentionally conservative — anything uncertain is left
+  // un-memoized so behavior/output never changes, only redundant
+  // recursive steps are skipped.
+  _analyzeFunctionPurity(){
+    const IMPURE_CALLS = new Set(['printf','scanf','sprintf','puts','putchar','fprintf',
+      'fopen','fclose','fgets','malloc','calloc','realloc','free','rand','srand','exit',
+      'va_start','va_arg','va_end']);
+    for(const [name, fn] of Object.entries(this.functions)){
+      const scalarParams = fn.params.every(p=>!p.isArr && !p.isVariadic && !(p.type||'').includes('*'));
+      if(!scalarParams) continue;
+      let pure = true;
+      const visitExpr = (node) => {
+        if(!pure || !node || typeof node!=='object') return;
+        if(node.type==='call'){
+          const fnName = node.fn && node.fn.n;
+          if(fnName && IMPURE_CALLS.has(fnName)){ pure=false; return; }
+        }
+        if(node.type==='id'){
+          if(Object.prototype.hasOwnProperty.call(this.globals, node.n)){ pure=false; return; }
+        }
+        if(node.type==='addr' || node.type==='deref'){ pure=false; return; }
+        for(const key of Object.keys(node)){
+          if(key==='type'||key==='ln') continue;
+          const child=node[key];
+          if(Array.isArray(child)){ for(const it of child){ if(it&&typeof it==='object') visitExpr(it); } }
+          else if(child && typeof child==='object') visitExpr(child);
+        }
+      };
+      const walkStmt = (s) => {
+        if(!pure || !s) return;
+        switch(s.type){
+          case 'block': s.body.forEach(walkStmt); break;
+          case 'decl':
+            if(s.isStatic){ pure=false; return; }
+            for(const d of s.decls){
+              if(d.isArr){ pure=false; return; }
+              if(d.init) visitExpr(d.init);
+            }
+            break;
+          case 'expr': visitExpr(s.expr); break;
+          case 'return': if(s.val) visitExpr(s.val); break;
+          case 'if': visitExpr(s.cond); walkStmt(s.then); if(s.else) walkStmt(s.else); break;
+          case 'while': visitExpr(s.cond); walkStmt(s.body); break;
+          case 'do': visitExpr(s.cond); walkStmt(s.body); break;
+          case 'for':
+            if(s.init){
+              if(s.init.type==='decl'){ for(const d of s.init.decls){ if(d.init) visitExpr(d.init); } }
+              else visitExpr(s.init);
+            }
+            if(s.cond) visitExpr(s.cond);
+            if(s.update) visitExpr(s.update);
+            walkStmt(s.body);
+            break;
+          case 'switch':
+            visitExpr(s.disc);
+            for(const c of s.cases){ if(c.val) visitExpr(c.val); c.body.forEach(walkStmt); }
+            break;
+          default: break;
+        }
+      };
+      fn.body.forEach(walkStmt);
+      if(pure) this._pureFunctions.add(name);
+    }
+  }
+
   _run(){
     this._addStep({ln:1,desc:'Program starts &rarr; calling <b>main()</b>',frames:[],heap:{},out:'',cs:[]});
     if(!this.functions['main']){this.errors.push('No main() function found.');return;}
@@ -3240,6 +3322,22 @@ class CInterpreter {
   _callFn(name,args,callSite){
     const fn=this.functions[name];
     if(!fn)throw new Error('Undefined function: '+name+(callSite?.ln?(' (line '+callSite.ln+')'):''));
+
+    // ─── Memoized shortcut ────────────────────────────────────────────
+    // If this exact function+arguments combination was already fully
+    // evaluated earlier (and the function is provably pure), reuse the
+    // cached result instead of re-running the whole recursive subtree.
+    // A single step is still recorded so every call remains visible in
+    // the trace — only the repeated internal work is skipped.
+    let memoKey=null;
+    if(this._pureFunctions.has(name) && args.every(a=>typeof a==='number'||typeof a==='string'||a===null)){
+      memoKey=name+'|'+JSON.stringify(args);
+      if(Object.prototype.hasOwnProperty.call(this._memoCache,memoKey)){
+        const cached=this._memoCache[memoKey];
+        this._addStep({ln:fn.line||1,desc:`Called <b>${name}(${args.map(a=>this._fv(a)).join(', ')})</b> &mdash; already computed earlier, reusing cached result <b>${this._fv(cached)}</b> (skipping repeated recursion)`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+        return cached;
+      }
+    }
 
     const frame={name,vars:{},retVal:undefined,_variadicArgs:[]};
     const isVariadic=fn.params.some(p=>p.isVariadic);
@@ -3260,6 +3358,9 @@ class CInterpreter {
     this._popScope(frame, fnScope);
     this._callStack.pop();
     this._addStep({ln:callSite?.ln||fn.line||1,desc:`<b>${name}()</b> returned ${frame.retVal!==undefined?this._fv(frame.retVal):'void'}`,frames:this._snapFrames(),heap:this._snapHeap(),out:this.output,cs:this._callStack.map(f=>f.name)});
+    if(memoKey!==null && frame.retVal!==undefined){
+      this._memoCache[memoKey]=frame.retVal;
+    }
     return frame.retVal;
   }
 
