@@ -1958,7 +1958,7 @@ int main() {
 
     printf("Friend 1 printing Friend 2's info\\n");
     printf("Name: %s\\n", *f1_ptr_name);
-    printf("Occupation: %s\\n", *f1_ptr_job);
+    printf("Occupation: %s\\n\\n", *f1_ptr_job);
 
     printf("Friend 2 printing Friend 1's info\\n");
     printf("Name: %s\\n", *f2_ptr_name);
