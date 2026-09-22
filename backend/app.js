@@ -1482,6 +1482,285 @@ int main() {
     printf("\\n");
     return 0;
 }`,
+
+dijkstra:`#include <stdio.h>
+#define V 6
+#define INF 9999
+
+int adj[V][V];
+int dist[V];
+int visited[V];
+
+void addEdge(int u, int v, int w) {
+    adj[u][v] = w;
+    adj[v][u] = w;
+}
+
+int minDistance() {
+    int min = INF, minIndex = -1;
+    int i;
+    for (i = 0; i < V; i++) {
+        if (!visited[i] && dist[i] <= min) {
+            min = dist[i];
+            minIndex = i;
+        }
+    }
+    return minIndex;
+}
+
+void dijkstra(int src) {
+    int i, j;
+    for (i = 0; i < V; i++) {
+        dist[i] = INF;
+        visited[i] = 0;
+    }
+    dist[src] = 0;
+
+    for (i = 0; i < V - 1; i++) {
+        int u = minDistance();
+        if (u == -1) break;
+        visited[u] = 1;
+        printf("Visiting node %d (dist=%d)\\n", u, dist[u]);
+
+        for (j = 0; j < V; j++) {
+            if (!visited[j] && adj[u][j] && dist[u] != INF &&
+                dist[u] + adj[u][j] < dist[j]) {
+                dist[j] = dist[u] + adj[u][j];
+                printf("  Relax edge %d->%d, new dist[%d]=%d\\n", u, j, j, dist[j]);
+            }
+        }
+    }
+}
+
+int main() {
+    int i, j;
+    for (i = 0; i < V; i++)
+        for (j = 0; j < V; j++)
+            adj[i][j] = 0;
+
+    addEdge(0, 1, 4);
+    addEdge(0, 2, 2);
+    addEdge(1, 2, 1);
+    addEdge(1, 3, 5);
+    addEdge(2, 3, 8);
+    addEdge(2, 4, 10);
+    addEdge(3, 4, 2);
+    addEdge(3, 5, 6);
+    addEdge(4, 5, 3);
+
+    dijkstra(0);
+
+    printf("\\nShortest distances from node 0:\\n");
+    for (i = 0; i < V; i++)
+        printf("Node %d: %d\\n", i, dist[i]);
+
+    return 0;
+}`,
+
+prim:`#include <stdio.h>
+#define V 6
+#define INF 9999
+
+int adj[V][V];
+int key[V];
+int parent[V];
+int inMST[V];
+
+int minKey() {
+    int min = INF, minIndex = -1, i;
+    for (i = 0; i < V; i++) {
+        if (!inMST[i] && key[i] < min) {
+            min = key[i];
+            minIndex = i;
+        }
+    }
+    return minIndex;
+}
+
+void addEdge(int u, int v, int w) {
+    adj[u][v] = w;
+    adj[v][u] = w;
+}
+
+void primMST() {
+    int i, j;
+    for (i = 0; i < V; i++) {
+        key[i] = INF;
+        inMST[i] = 0;
+        parent[i] = -1;
+    }
+    key[0] = 0;
+
+    for (i = 0; i < V - 1; i++) {
+        int u = minKey();
+        if (u == -1) break;
+        inMST[u] = 1;
+        printf("Add node %d to MST\\n", u);
+
+        for (j = 0; j < V; j++) {
+            if (adj[u][j] && !inMST[j] && adj[u][j] < key[j]) {
+                key[j] = adj[u][j];
+                parent[j] = u;
+                printf("  Update key[%d]=%d via edge %d-%d\\n", j, key[j], u, j);
+            }
+        }
+    }
+}
+
+int main() {
+    int i, j, total = 0;
+    for (i = 0; i < V; i++)
+        for (j = 0; j < V; j++)
+            adj[i][j] = 0;
+
+    addEdge(0, 1, 4);
+    addEdge(0, 2, 3);
+    addEdge(1, 2, 1);
+    addEdge(1, 3, 2);
+    addEdge(2, 3, 4);
+    addEdge(3, 4, 2);
+    addEdge(4, 5, 6);
+    addEdge(2, 4, 5);
+
+    primMST();
+
+    printf("\\nMinimum Spanning Tree edges:\\n");
+    for (i = 1; i < V; i++) {
+        printf("%d - %d  (weight %d)\\n", parent[i], i, key[i]);
+        total += key[i];
+    }
+    printf("Total MST weight: %d\\n", total);
+
+    return 0;
+}`,
+
+kruskal:`#include <stdio.h>
+#define V 6
+#define E 8
+#define INF 9999
+
+int adj[V][V];
+int parent[V];
+
+int edgeU[E] = {0,0,1,1,2,2,3,4};
+int edgeV[E] = {1,2,2,3,3,4,4,5};
+int edgeW[E] = {4,3,1,2,4,5,2,6};
+
+int find(int x) {
+    while (parent[x] != x) x = parent[x];
+    return x;
+}
+
+void unionSet(int a, int b) {
+    int ra = find(a), rb = find(b);
+    if (ra != rb) parent[ra] = rb;
+}
+
+void sortEdges() {
+    int i, j;
+    for (i = 0; i < E - 1; i++) {
+        for (j = 0; j < E - i - 1; j++) {
+            if (edgeW[j] > edgeW[j + 1]) {
+                int tw = edgeW[j]; edgeW[j] = edgeW[j+1]; edgeW[j+1] = tw;
+                int tu = edgeU[j]; edgeU[j] = edgeU[j+1]; edgeU[j+1] = tu;
+                int tv = edgeV[j]; edgeV[j] = edgeV[j+1]; edgeV[j+1] = tv;
+            }
+        }
+    }
+}
+
+int main() {
+    int i, j, total = 0, count = 0;
+
+    for (i = 0; i < V; i++)
+        for (j = 0; j < V; j++)
+            adj[i][j] = 0;
+
+    for (i = 0; i < E; i++) {
+        adj[edgeU[i]][edgeV[i]] = edgeW[i];
+        adj[edgeV[i]][edgeU[i]] = edgeW[i];
+    }
+
+    for (i = 0; i < V; i++) parent[i] = i;
+
+    sortEdges();
+    printf("Sorted edges by weight:\\n");
+    for (i = 0; i < E; i++)
+        printf("  %d-%d (w=%d)\\n", edgeU[i], edgeV[i], edgeW[i]);
+
+    printf("\\nBuilding MST:\\n");
+    for (i = 0; i < E && count < V - 1; i++) {
+        int u = edgeU[i], v = edgeV[i], w = edgeW[i];
+        if (find(u) != find(v)) {
+            unionSet(u, v);
+            printf("Take edge %d-%d (w=%d)\\n", u, v, w);
+            total += w;
+            count++;
+        } else {
+            printf("Skip edge %d-%d (w=%d) -> would form a cycle\\n", u, v, w);
+        }
+    }
+
+    printf("\\nTotal MST weight: %d\\n", total);
+    return 0;
+}`,
+
+tree_bfs:`#include <stdio.h>
+#include <stdlib.h>
+
+struct Node {
+    int data;
+    struct Node *left;
+    struct Node *right;
+};
+
+struct Node* newNode(int d) {
+    struct Node *n = (struct Node*)malloc(sizeof(struct Node));
+    n->data = d;
+    n->left = n->right = NULL;
+    return n;
+}
+
+#define MAXQ 20
+struct Node* queue[MAXQ];
+int qFront = 0, qRear = -1, qSize = 0;
+
+void enqueue(struct Node *n) {
+    queue[++qRear] = n;
+    qSize++;
+}
+
+struct Node* dequeue() {
+    qSize--;
+    return queue[qFront++];
+}
+
+void levelOrder(struct Node *root) {
+    if (!root) return;
+    enqueue(root);
+    printf("Level order (BFS) traversal:\\n");
+    while (qSize > 0) {
+        struct Node *cur = dequeue();
+        printf("Visit %d\\n", cur->data);
+        if (cur->left) enqueue(cur->left);
+        if (cur->right) enqueue(cur->right);
+    }
+}
+
+int main() {
+    struct Node *root = newNode(1);
+    root->left        = newNode(2);
+    root->right       = newNode(3);
+    root->left->left  = newNode(4);
+    root->left->right = newNode(5);
+    root->right->left = newNode(6);
+    root->right->right= newNode(7);
+
+    levelOrder(root);
+
+    return 0;
+}`,
+
 hash_table:`#include <stdio.h>
 #define SIZE 10
 
@@ -4563,6 +4842,30 @@ function isSquareBinaryMatrix(val) {
   return true;
 }
 
+function isNonNegIntSquareMatrix(val) {
+  if (!Array.isArray(val) || val.length < 2 || val.length > 32) return false;
+  const n = val.length;
+  for (const row of val) {
+    if (!Array.isArray(row) || row.length !== n) return false;
+    for (const c of row) {
+      const num = Number(c);
+      if (!Number.isFinite(num) || num < 0 || !Number.isInteger(num) || num > 100000) return false;
+    }
+  }
+  return true;
+}
+
+function looksLikeGraphName(name) {
+  return /adj|graph|weight|dist|mst|edge/i.test(name);
+}
+
+// Accepts either the existing 0/1 style matrix (any name) or a weighted
+// non-negative-integer matrix whose variable name looks graph-related.
+function isGraphAdjMatrix(val, name) {
+  if (isSquareBinaryMatrix(val)) return true;
+  return isNonNegIntSquareMatrix(val) && looksLikeGraphName(name);
+}
+
 function findGraphCandidate(frames) {
   if (!frames || !frames.length) return null;
   let best = null;
@@ -4570,6 +4873,9 @@ function findGraphCandidate(frames) {
     for (const [name, v] of Object.entries(fr.vars || {})) {
       const val = v.value;
       if (isSquareBinaryMatrix(val)) {
+        const score = /adj/i.test(name) ? 4 : 3;
+        if (!best || score > best.score) best = { name, val, n: val.length, score };
+      } else if (isNonNegIntSquareMatrix(val) && looksLikeGraphName(name)) {
         const score = /adj/i.test(name) ? 2 : 1;
         if (!best || score > best.score) best = { name, val, n: val.length, score };
       }
@@ -4651,11 +4957,20 @@ function renderGraphSection(frames) {
   }
 
   let edges = '';
+  let edgeLabels = '';
+  const isWeighted = matrix.some(row => row.some(c => Number(c) > 1));
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      if (Number(matrix[i][j]) === 1 || Number(matrix[j][i]) === 1) {
+      const w = Math.max(Number(matrix[i][j]) || 0, Number(matrix[j][i]) || 0);
+      if (w > 0) {
         const hl = current && (current.idx === i || current.idx === j);
         edges += `<line x1="${pts[i].x.toFixed(1)}" y1="${pts[i].y.toFixed(1)}" x2="${pts[j].x.toFixed(1)}" y2="${pts[j].y.toFixed(1)}" class="${hl ? 'graph-edge graph-edge-hl' : 'graph-edge'}"></line>`;
+        if (isWeighted) {
+          const mx = (pts[i].x + pts[j].x) / 2;
+          const my = (pts[i].y + pts[j].y) / 2;
+          edgeLabels += `<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="9" fill="var(--card-bg,#1e222a)" stroke="var(--text3,#888)" stroke-width="0.6"></circle>` +
+                        `<text x="${mx.toFixed(1)}" y="${(my + 3.5).toFixed(1)}" text-anchor="middle" font-size="9" fill="var(--text1,#eee)">${w}</text>`;
+        }
       }
     }
   }
@@ -4677,7 +4992,7 @@ function renderGraphSection(frames) {
       ${current ? `<span><span class="graph-legend-dot" style="border-color:var(--graph-current,#e5c07b);border-width:2.5px"></span>current (${current.name} = ${current.idx})</span>` : ''}
     </div>`;
 
-  svgWrap.innerHTML = `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="max-width:100%">${edges}${nodes}</svg>${legend}`;
+  svgWrap.innerHTML = `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="max-width:100%">${edges}${nodes}${edgeLabels}</svg>${legend}`;
 }
 
 let execMark = null;
@@ -5177,7 +5492,7 @@ function renderFrames(frames, chg, step) {
           const is2D = val.length > 0 && Array.isArray(val[0]);
           const matchState = getMatchState(step);
           const touches = getTouchesForName(step, name);
-          if (is2D && isSquareBinaryMatrix(val)) {
+          if (is2D && isGraphAdjMatrix(val, name)) {
             // This 2D array qualifies as a graph adjacency matrix — don't
             // draw it as raw per-cell grid here. Instead show a compact
             // reference pointing at the dedicated "Graph / Adjacency
@@ -5474,10 +5789,12 @@ function drawArrows() {
       
   });
 }
+
 function setStatus(type, msg) {
   sbDot.style.color = type === 'ok' ? '#23d18b' : type === 'error' ? '#f48771' : 'rgba(255,255,255,.7)';
   sbTxt.textContent = msg;
     
 }
+
 applyTheme('light');
 resetViz();
