@@ -292,6 +292,102 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
 .ptr-arrow-dot{fill:var(--ptr-color);}
 .arrow-anchor{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ptr-color);margin-left:5px;vertical-align:middle;box-shadow:0 0 0 2px rgba(197,134,192,.25);}
 .vv.vptr.ptr-src{cursor:default;}
-@media (max-width:1100px){#card-output{grid-column:1 / 3;}#card-callstack{grid-column:1 / 3;}}
-@media (max-width:800px){html,body{overflow-y:auto;overflow-x:hidden;height:auto;}#app{flex-direction:column;height:auto;min-height:calc(100vh - 48px - 22px);}#editor-panel{width:100% !important;max-width:100%;height:56vh;min-height:320px;border-right:none;border-bottom:1px solid var(--vsc-border);flex-shrink:0;}#resize-handle{display:none;}#viz-panel{flex:1;min-height:60vh;overflow:visible;}#viz-grid{grid-template-columns:1fr;}#card-memory,#card-output,#card-callstack,#card-memmap{grid-column:1 / 2;}.viz-card-body{max-height:320px;}#card-memory-body{height:380px;max-height:380px;min-height:380px;}#mem-cols{flex-direction:column;gap:18px;}#frames-col{max-width:100%;}#heap-section{max-width:100%;}}
+
+/* ── Graph / Adjacency Matrix column ─────────────────────────────────────
+   #graph-section is inserted dynamically (see ensureGraphSection() in
+   app.js) as a THIRD flex child inside #mem-cols, alongside #frames-col
+   (Stack Memory) and #heap-section (Heap Memory). Those two already carry
+   flex:0 0 auto + min/max-width, which is what keeps them a stable,
+   predictable size regardless of content. This section previously had no
+   such sizing of its own, so it collapsed/wrapped unpredictably instead of
+   matching the other two columns — this block gives it the same treatment
+   (flex:0 0 auto, fixed target width, min/max bounds) so all three columns
+   line up consistently, with a vertical divider matching the visual
+   grouping of the other two. */
+#graph-section{
+    flex:0 0 auto;
+    width:320px;
+    min-width:280px;
+    max-width:420px;
+    box-sizing:border-box;
+    position:relative;
+    z-index:2;
+    align-self:stretch;
+    border-left:1px solid var(--vsc-border);
+    padding-left:20px;
+    margin-top:0;
+    padding-top:0;
+}
+/* header row ("Graph / Adjacency Matrix") — match the height/spacing of
+   the "Stack Memory" / "Heap Memory" section headers rendered elsewhere */
+#graph-section > div:first-child{
+    height:20px;
+    display:flex;
+    align-items:center;
+    margin-bottom:8px;
+}
+#graph-empty{
+    width:100%;
+    box-sizing:border-box;
+}
+#graph-content{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    width:100%;
+}
+#graph-matrix-wrap{
+    width:100%;
+    max-width:100%;
+    overflow-x:auto;
+}
+.graph-svg-box{
+    width:100%;
+}
+.graph-svg-box svg{
+    max-width:100%;
+    height:auto;
+    display:block;
+}
+.adj-matrix-tbl{
+    max-width:100%;
+    border-collapse:collapse;
+}
+
+/* Node number labels default to a light fill (set by the JS-injected
+   .graph-node-label rule) so they stay readable on the dark/white default
+   node background. Visited nodes (.graph-node-visited) and the current
+   node (.graph-node-current) are drawn with a light-green fill, which
+   makes that same light text invisible. The <circle> and its <text> are
+   emitted as adjacent siblings within the same <svg> (see the `nodes +=`
+   loop that builds the graph diagram), so an adjacent-sibling selector
+   reliably targets just the label that follows a highlighted circle.
+   !important is required here because the graph styles are injected into
+   <head> via a <style> tag at runtime, appended AFTER this stylesheet —
+   without !important that later same-specificity rule would win and this
+   override would be silently ignored regardless of source order. */
+circle.graph-node-visited + text.graph-node-label,
+circle.graph-node-current + text.graph-node-label{
+    fill:#e2691a !important;
+}
+
+/* ── Draggable heap blocks (float freely anywhere in the Variables card) ── */
+@media (max-width:1100px){
+    #card-output{grid-column:1 / 3;}
+    #card-callstack{grid-column:1 / 3;}
+    #mem-cols{flex-wrap:wrap;}
+    #frames-col,#heap-section,#graph-section{
+        width:100%;
+        max-width:100%;
+        min-width:0;
+    }
+    #graph-section{
+        border-left:none;
+        padding-left:0;
+        border-top:1px solid var(--vsc-border);
+        padding-top:14px;
+        margin-top:8px;
+    }
+}
+@media (max-width:800px){html,body{overflow-y:auto;overflow-x:hidden;height:auto;}#app{flex-direction:column;height:auto;min-height:calc(100vh - 48px - 22px);}#editor-panel{width:100% !important;max-width:100%;height:56vh;min-height:320px;border-right:none;border-bottom:1px solid var(--vsc-border);flex-shrink:0;}#resize-handle{display:none;}#viz-panel{flex:1;min-height:60vh;overflow:visible;}#viz-grid{grid-template-columns:1fr;}#card-memory,#card-output,#card-callstack,#card-memmap{grid-column:1 / 2;}.viz-card-body{max-height:320px;}#card-memory-body{height:380px;max-height:380px;min-height:380px;}#mem-cols{flex-direction:column;gap:18px;}#frames-col{max-width:100%;}#heap-section{max-width:100%;}#graph-section{border-top:1px solid var(--vsc-border);padding-top:14px;border-left:none;padding-left:0;max-width:100%;width:100%;}}
 @media (max-width:520px){.col-type{display:none;}.tb-btn span{display:none;}.sample-group label{display:none;}.viz-card-body{max-height:280px;padding:10px;}#card-memory-body{height:340px;max-height:340px;min-height:340px;}.viz-card-hdr{font-size:11px;padding:0 10px;}#viz-panel{padding:10px;}#viz-grid{gap:10px;}}
