@@ -4466,6 +4466,220 @@ cmWrapperEl.addEventListener('click', ensureEditorFocused);
   document.head.appendChild(style);
 })();
 
+// ─── Graph / Adjacency-Matrix Visualizer ─────────────────────────────────────
+// Detects a square 0/1-valued 2D array in the current frames (typically named
+// `adj`/`adjMatrix`, e.g. int adj[V][V]) and renders it two ways at once:
+//   1) as a labeled adjacency-matrix table (row/col headers 0..n-1), and
+//   2) as an actual node-and-edge graph (circular layout), colored using a
+//      companion `visited[]` array (if present) and the current traversal
+//      node (if a scalar like `node`/`start`/`u`/`v`/`cur` is in scope).
+// This mirrors the hand-drawn "Adjacency Matrix + Graph" reference sketch.
+//
+// IMPORTANT: whenever a variable qualifies as a graph adjacency matrix, the
+// normal per-cell array visualizer is intentionally suppressed for that
+// variable in the stack-frame panel (see the `graph-matrix-ref` placeholder
+// built in renderFrames below) — the matrix + graph combo below is the only
+// place it is drawn, exactly like the hand-drawn "Adjacency Matrix / Graph"
+// reference the visualizer is modeled on.
+(function injectGraphStyles(){
+  if (document.getElementById('graph-viz-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'graph-viz-styles';
+  style.textContent = `
+    #graph-section { border-top: 1px solid var(--border, #3a3f4b); padding-top: 12px; }
+    .adj-matrix-tbl { border-collapse: collapse; font-size: 11px; }
+    .adj-matrix-tbl th, .adj-matrix-tbl td {
+      border: 1px solid var(--border, #3a3f4b);
+      width: 26px; height: 24px; text-align: center; padding: 0;
+    }
+    .adj-matrix-tbl th { color: var(--text3,#888); font-weight: 600; background: transparent; }
+    .adj-matrix-tbl th.adj-corner { border: none; }
+    .adj-cell-on { background: rgba(97,175,239,0.22); font-weight: 700; color: var(--tok-fn,#61afef); }
+    .adj-cell-off { color: var(--text3,#888); }
+    .adj-cell-hl { outline: 2px solid var(--graph-current,#e5c07b); outline-offset: -2px; }
+    .graph-svg-box { display:flex; flex-direction:column; align-items:flex-start; }
+    .graph-edge { stroke: var(--text3, #888); stroke-width: 1.6; }
+    .graph-edge-hl { stroke: var(--graph-current,#e5c07b); stroke-width: 2.6; }
+    .graph-node { fill: var(--card-bg, #1e222a); stroke: var(--graph-node,#61afef); stroke-width: 2; }
+    .graph-node-visited { fill: rgba(35,209,139,0.28); stroke: var(--graph-visited,#23d18b); }
+    .graph-node-current { stroke: var(--graph-current,#e5c07b); stroke-width: 3.5; }
+    .graph-node-label { font-size: 11px; text-anchor: middle; fill: var(--text1,#eee); font-weight: 700; pointer-events:none; }
+    .graph-legend { display:flex; gap:12px; font-size:10.5px; color:var(--text3,#888); margin-top:6px; flex-wrap:wrap; }
+    .graph-legend-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:middle; border: 2px solid transparent; }
+    .graph-content-row { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; }
+    .graph-matrix-ref {
+      display:flex; align-items:center; gap:6px;
+      font-size:11px; color: var(--tok-fn,#61afef);
+      background: rgba(97,175,239,0.12);
+      border: 1px dashed rgba(97,175,239,0.45);
+      border-radius: 6px;
+      padding: 8px 10px;
+      cursor: pointer;
+      line-height: 1.35;
+    }
+    .graph-matrix-ref i { font-size:12px; flex-shrink:0; }
+    .graph-matrix-ref:hover { background: rgba(97,175,239,0.2); }
+  `;
+  document.head.appendChild(style);
+})();
+
+function ensureGraphSection() {
+  if (document.getElementById('graph-section')) return;
+  const sec = document.createElement('div');
+  sec.id = 'graph-section';
+  sec.style.marginTop = '14px';
+  sec.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
+      <i class="fa-solid fa-diagram-project" style="color:var(--tok-fn,#61afef)"></i>
+      <span>Graph / Adjacency Matrix</span>
+    </div>
+    <div id="graph-empty" class="empty"><i class="fa-solid fa-diagram-project"></i><p>No adjacency matrix detected yet. Declare a square 0/1 2D array (e.g. <code>int adj[V][V]</code>) to see it here.</p></div>
+    <div id="graph-content" class="graph-content-row" style="display:none;">
+      <div id="graph-matrix-wrap" style="overflow:auto;"></div>
+      <div id="graph-svg-wrap" class="graph-svg-box"></div>
+    </div>`;
+  const anchor = document.getElementById('heap-section');
+  if (anchor && anchor.parentElement) {
+    anchor.parentElement.insertBefore(sec, anchor.nextSibling);
+  } else if (typeof framesEl !== 'undefined' && framesEl && framesEl.parentElement) {
+    framesEl.parentElement.appendChild(sec);
+  } else {
+    document.body.appendChild(sec);
+  }
+}
+
+function isBinary01(v) {
+  const n = Number(v);
+  return n === 0 || n === 1;
+}
+
+function isSquareBinaryMatrix(val) {
+  if (!Array.isArray(val) || val.length < 2 || val.length > 32) return false;
+  const n = val.length;
+  for (const row of val) {
+    if (!Array.isArray(row) || row.length !== n) return false;
+    for (const c of row) { if (!isBinary01(c)) return false; }
+  }
+  return true;
+}
+
+function findGraphCandidate(frames) {
+  if (!frames || !frames.length) return null;
+  let best = null;
+  for (const fr of frames) {
+    for (const [name, v] of Object.entries(fr.vars || {})) {
+      const val = v.value;
+      if (isSquareBinaryMatrix(val)) {
+        const score = /adj/i.test(name) ? 2 : 1;
+        if (!best || score > best.score) best = { name, val, n: val.length, score };
+      }
+    }
+  }
+  if (!best) return null;
+  const n = best.n;
+
+  let visited = null;
+  for (const fr of frames) {
+    for (const [name, v] of Object.entries(fr.vars || {})) {
+      const val = v.value;
+      if (Array.isArray(val) && val.length === n && val !== best.val && val.every(isBinary01) && /visit/i.test(name)) {
+        visited = { name, val };
+      }
+    }
+  }
+
+  let current = null;
+  const activeFrame = frames[frames.length - 1];
+  if (activeFrame) {
+    for (const [name, v] of Object.entries(activeFrame.vars || {})) {
+      const val = v.value;
+      if (typeof val === 'number' && Number.isInteger(val) && val >= 0 && val < n &&
+          /^(node|start|cur|current|curnode|u|v)$/i.test(name)) {
+        current = { name, idx: val };
+        break;
+      }
+    }
+  }
+
+  return { name: best.name, matrix: best.val, n, visited, current };
+}
+
+function renderGraphSection(frames) {
+  ensureGraphSection();
+  const emptyEl = document.getElementById('graph-empty');
+  const contentEl = document.getElementById('graph-content');
+  const matrixWrap = document.getElementById('graph-matrix-wrap');
+  const svgWrap = document.getElementById('graph-svg-wrap');
+  if (!emptyEl || !contentEl) return;
+
+  const cand = findGraphCandidate(frames);
+  if (!cand) {
+    emptyEl.style.display = '';
+    contentEl.style.display = 'none';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  contentEl.style.display = 'flex';
+
+  const { name, matrix, n, visited, current } = cand;
+
+  // ── Adjacency matrix table ──
+  let mhtml = `<div style="font-size:11px;color:var(--text3);margin-bottom:4px">Adjacency Matrix — <code>${name}</code> [${n}×${n}]</div>`;
+  mhtml += '<table class="adj-matrix-tbl"><thead><tr><th class="adj-corner"></th>';
+  for (let j = 0; j < n; j++) mhtml += `<th>${j}</th>`;
+  mhtml += '</tr></thead><tbody>';
+  for (let i = 0; i < n; i++) {
+    const rowHl = current && current.idx === i;
+    mhtml += `<tr><th>${i}</th>`;
+    for (let j = 0; j < n; j++) {
+      const v = Number(matrix[i][j]) || 0;
+      const hl = rowHl ? ' adj-cell-hl' : '';
+      mhtml += `<td class="${v ? 'adj-cell-on' : 'adj-cell-off'}${hl}">${v}</td>`;
+    }
+    mhtml += '</tr>';
+  }
+  mhtml += '</tbody></table>';
+  matrixWrap.innerHTML = mhtml;
+
+  // ── Graph diagram (circular layout, SVG) ──
+  const size = 240;
+  const cx = size / 2, cy = size / 2, r = size / 2 - 28;
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const ang = -Math.PI / 2 + (2 * Math.PI * i) / n;
+    pts.push({ x: cx + r * Math.cos(ang), y: cy + r * Math.sin(ang) });
+  }
+
+  let edges = '';
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (Number(matrix[i][j]) === 1 || Number(matrix[j][i]) === 1) {
+        const hl = current && (current.idx === i || current.idx === j);
+        edges += `<line x1="${pts[i].x.toFixed(1)}" y1="${pts[i].y.toFixed(1)}" x2="${pts[j].x.toFixed(1)}" y2="${pts[j].y.toFixed(1)}" class="${hl ? 'graph-edge graph-edge-hl' : 'graph-edge'}"></line>`;
+      }
+    }
+  }
+
+  let nodes = '';
+  for (let i = 0; i < n; i++) {
+    const isVisited = visited && Number(visited.val[i]) === 1;
+    const isCurrent = current && current.idx === i;
+    let cls = 'graph-node';
+    if (isVisited) cls += ' graph-node-visited';
+    if (isCurrent) cls += ' graph-node-current';
+    nodes += `<circle cx="${pts[i].x.toFixed(1)}" cy="${pts[i].y.toFixed(1)}" r="16" class="${cls}"></circle>` +
+             `<text x="${pts[i].x.toFixed(1)}" y="${(pts[i].y + 4).toFixed(1)}" class="graph-node-label">${i}</text>`;
+  }
+
+  const legend = `<div class="graph-legend">
+      <span><span class="graph-legend-dot" style="background:var(--card-bg,#1e222a);border-color:var(--graph-node,#61afef)"></span>node</span>
+      ${visited ? `<span><span class="graph-legend-dot" style="background:rgba(35,209,139,0.4);border-color:var(--graph-visited,#23d18b)"></span>visited (${visited.name})</span>` : ''}
+      ${current ? `<span><span class="graph-legend-dot" style="border-color:var(--graph-current,#e5c07b);border-width:2.5px"></span>current (${current.name} = ${current.idx})</span>` : ''}
+    </div>`;
+
+  svgWrap.innerHTML = `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="max-width:100%">${edges}${nodes}</svg>${legend}`;
+}
+
 let execMark = null;
 
 function extractForClauses(lineText) {
@@ -4722,6 +4936,8 @@ function resetViz() {
   sbLine.textContent = '—'; sbStep.textContent = '—'; sbFrames.textContent = '0';
   if (arrowSvg) arrowSvg.innerHTML = '';
   if (execMark) { try { execMark.clear(); } catch(e){} execMark = null; }
+  ensureGraphSection();
+  renderGraphSection(null);
 }
 
 function clearOutput() {
@@ -4822,6 +5038,7 @@ function renderStep(idx) {
   renderHeap(step.heap, step);
   renderCS(step.cs);
   renderMM(step.frames, step.heap);
+  renderGraphSection(step.frames);
   drawArrows();
 }
 
@@ -4960,7 +5177,17 @@ function renderFrames(frames, chg, step) {
           const is2D = val.length > 0 && Array.isArray(val[0]);
           const matchState = getMatchState(step);
           const touches = getTouchesForName(step, name);
-          if (is2D) {
+          if (is2D && isSquareBinaryMatrix(val)) {
+            // This 2D array qualifies as a graph adjacency matrix — don't
+            // draw it as raw per-cell grid here. Instead show a compact
+            // reference pointing at the dedicated "Graph / Adjacency
+            // Matrix" panel below, which renders it as a proper labeled
+            // matrix table plus a node-and-edge graph diagram.
+            vhtml = `<div class="graph-matrix-ref" onclick="document.getElementById('graph-section')?.scrollIntoView({behavior:'smooth',block:'center'})">` +
+              `<i class="fa-solid fa-diagram-project"></i>` +
+              `<span>Adjacency Matrix <b>${name}</b> [${val.length}&times;${val.length}] &mdash; shown as a proper matrix + graph in the <b>Graph / Adjacency Matrix</b> panel below</span>` +
+              `</div>`;
+          } else if (is2D) {
             vhtml = '<div style="display:flex;flex-direction:column;gap:3px">';
             val.forEach((row) => { vhtml += buildArrCellsHtml(row, v.type, false); });
             vhtml += '</div>';
