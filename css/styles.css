@@ -295,3 +295,125 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
 @media (max-width:1100px){#card-output{grid-column:1 / 3;}#card-callstack{grid-column:1 / 3;}}
 @media (max-width:800px){html,body{overflow-y:auto;overflow-x:hidden;height:auto;}#app{flex-direction:column;height:auto;min-height:calc(100vh - 48px - 22px);}#editor-panel{width:100% !important;max-width:100%;height:56vh;min-height:320px;border-right:none;border-bottom:1px solid var(--vsc-border);flex-shrink:0;}#resize-handle{display:none;}#viz-panel{flex:1;min-height:60vh;overflow:visible;}#viz-grid{grid-template-columns:1fr;}#card-memory,#card-output,#card-callstack,#card-memmap{grid-column:1 / 2;}.viz-card-body{max-height:320px;}#card-memory-body{height:380px;max-height:380px;min-height:380px;}#mem-cols{flex-direction:column;gap:18px;}#frames-col{max-width:100%;}#heap-section{max-width:100%;}}
 @media (max-width:520px){.col-type{display:none;}.tb-btn span{display:none;}.sample-group label{display:none;}.viz-card-body{max-height:280px;padding:10px;}#card-memory-body{height:340px;max-height:340px;min-height:340px;}.viz-card-hdr{font-size:11px;padding:0 10px;}#viz-panel{padding:10px;}#viz-grid{gap:10px;}}
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Graph & Adjacency Matrix Component (Matching Stack & Heap Memory Design)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.graph-matrix-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 280px;
+    max-width: 480px;
+    background: var(--vsc-panel);
+    border: 1px solid var(--vsc-border2);
+    border-left: 3px solid var(--vsc-purple, #c586c0);
+    border-radius: 4px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    font-family: 'Fira Code', monospace;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.graph-matrix-card:hover {
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* Header matching Frame / Heap Headings */
+.graph-matrix-hdr {
+    background: var(--vsc-sidebar);
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--vsc-border);
+    font-size: 11.5px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-bright);
+}
+
+.graph-matrix-hdr i {
+    color: var(--vsc-purple, #c586c0);
+    font-size: 12px;
+}
+
+.graph-matrix-tag {
+    margin-left: auto;
+    font-size: 10px;
+    background: var(--vsc-purple, #c586c0);
+    color: #fff;
+    border-radius: 3px;
+    padding: 1px 7px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Body container matching memory scroll views */
+.graph-matrix-body {
+    padding: 10px 12px;
+    overflow-x: auto;
+    overflow-y: auto;
+    background: var(--heap-bg, var(--vsc-bg));
+}
+
+/* Adjacency Matrix Table Layout */
+.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: center;
+    font-size: 12px;
+}
+
+.matrix-table th,
+.matrix-table td {
+    padding: 6px 8px;
+    border: 1px solid rgba(100, 100, 100, 0.2);
+    vertical-align: middle;
+}
+
+/* Table Axis Headers (Row/Col Node Labels) */
+.matrix-table th {
+    background: rgba(0, 0, 0, 0.15);
+    color: var(--tok-fn, #dcdcaa);
+    font-weight: 600;
+    font-size: 11px;
+}
+
+/* Matrix Data Cells */
+.matrix-cell {
+    background: var(--vsc-input, #2d2d2d);
+    color: var(--vsc-green2, #23d18b);
+    font-weight: 600;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.matrix-cell.zero {
+    color: var(--text3, #5a5a5a);
+    font-weight: 400;
+}
+
+/* Interactive / Traversal Highlights (matching array & heap touches) */
+.matrix-cell.matrix-cell-touch {
+    background: rgba(0, 122, 204, 0.2);
+    border-color: var(--vsc-accent);
+    color: var(--vsc-accent);
+}
+
+.matrix-cell.matrix-cell-active {
+    background: rgba(215, 186, 125, 0.25);
+    border-color: var(--vsc-orange);
+    color: var(--vsc-orange);
+    transform: scale(1.05);
+}
+
+.matrix-cell.matrix-cell-visited {
+    background: rgba(78, 201, 176, 0.2);
+    border-color: var(--vsc-green);
+    color: var(--vsc-green);
+}
