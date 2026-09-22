@@ -298,16 +298,17 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
 
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Graph / Adjacency Matrix Component (Strict Fixed-Width matching Stack & Heap)
+   Graph / Adjacency Matrix Component (Strict Fixed Width matching Stack & Heap)
    ───────────────────────────────────────────────────────────────────────────── */
 
 .graph-matrix-card {
     display: flex;
     flex-direction: column;
-    /* Exact fixed sizing matching stack frames and heap memory blocks */
-    width: 320px;
-    min-width: 320px;
-    max-width: 320px;
+    /* Enforce rigid exact sizing identical to Stack/Heap containers */
+    width: 320px !important;
+    min-width: 320px !important;
+    max-width: 320px !important;
+    flex: 0 0 320px !important;
     background: var(--vsc-panel);
     border: 1px solid var(--vsc-border2);
     border-left: 3px solid var(--vsc-purple, #c586c0);
@@ -316,7 +317,6 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     font-family: 'Fira Code', monospace;
-    flex-shrink: 0;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -336,6 +336,7 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
     font-weight: 600;
     font-family: 'Inter', sans-serif;
     color: var(--text-bright);
+    white-space: nowrap;
 }
 
 .graph-matrix-hdr i {
@@ -358,10 +359,25 @@ html,body{height:100%;overflow:auto;font-family:'Inter',system-ui,sans-serif;bac
 
 /* Body container matching memory scroll views */
 .graph-matrix-body {
-    padding: 10px 12px;
+    padding: 12px;
     overflow-x: auto;
     overflow-y: auto;
     background: var(--heap-bg, var(--vsc-bg));
+    text-align: center;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+/* Empty or placeholder text state wrapping correctly inside 320px width */
+.graph-matrix-body p, 
+.graph-matrix-empty {
+    font-family: 'Inter', sans-serif;
+    font-size: 11.5px;
+    color: var(--text3, #858585);
+    line-height: 1.5;
+    margin: 0;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 /* Adjacency Matrix Table Layout */
