@@ -16,6 +16,134 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
 <link rel="stylesheet" href="css/styles.css">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+<style>
+  /* ===== Auth UI styles (added) ===== */
+  :root{
+    --cvp-modal-bg:#1e1e2e;
+    --cvp-modal-fg:#f2f2f5;
+    --cvp-modal-border:#3a3a4a;
+    --cvp-accent:#4285F4;
+  }
+  #auth-area{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  #user-chip{
+    display:none;
+    align-items:center;
+    gap:6px;
+    padding:2px 6px 2px 2px;
+    border-radius:20px;
+    background:rgba(255,255,255,0.08);
+  }
+  #user-avatar{
+    width:26px;height:26px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid rgba(255,255,255,0.35);
+    background:var(--cvp-accent);
+    color:#fff;
+    font-size:12px;
+    flex-shrink:0;
+  }
+  #user-name{
+    font-size:13px;
+    max-width:130px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  #logout-btn{margin-left:2px;}
+
+  #login-modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.55);
+    z-index:9999;
+    align-items:center;
+    justify-content:center;
+  }
+  #login-modal{
+    background:var(--cvp-modal-bg);
+    color:var(--cvp-modal-fg);
+    border:1px solid var(--cvp-modal-border);
+    border-radius:14px;
+    padding:32px 28px 26px;
+    width:340px;
+    max-width:90vw;
+    text-align:center;
+    box-shadow:0 20px 60px rgba(0,0,0,0.55);
+    position:relative;
+    font-family:'Inter',sans-serif;
+  }
+  #login-modal-close{
+    position:absolute;
+    top:10px;right:12px;
+    background:none;
+    border:none;
+    color:var(--cvp-modal-fg);
+    font-size:20px;
+    line-height:1;
+    cursor:pointer;
+    opacity:0.6;
+  }
+  #login-modal-close:hover{opacity:1;}
+  .login-modal-icon{
+    font-size:34px;
+    color:var(--cvp-accent);
+    margin-bottom:10px;
+  }
+  #login-modal h3{
+    margin:4px 0 8px;
+    font-size:18px;
+    font-weight:600;
+  }
+  #login-modal p{
+    font-size:13px;
+    opacity:0.8;
+    margin-bottom:20px;
+    line-height:1.45;
+  }
+  #login-name-input{
+    width:100%;
+    box-sizing:border-box;
+    padding:11px 14px;
+    border-radius:8px;
+    border:1px solid var(--cvp-modal-border);
+    background:rgba(255,255,255,0.06);
+    color:var(--cvp-modal-fg);
+    font-size:14px;
+    font-family:'Inter',sans-serif;
+    margin-bottom:14px;
+    outline:none;
+  }
+  #login-name-input:focus{border-color:var(--cvp-accent);}
+  #login-submit-btn{
+    width:100%;
+    padding:11px 14px;
+    border-radius:8px;
+    border:none;
+    background:var(--cvp-accent);
+    color:#fff;
+    font-size:14px;
+    font-weight:600;
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+  }
+  #login-submit-btn:hover{filter:brightness(1.08);}
+  #login-error{
+    color:#ff6b6b;
+    font-size:12px;
+    margin-top:8px;
+    min-height:14px;
+  }
+</style>
 </head>
   
 <body> 
@@ -150,7 +278,7 @@
     <button class="tb-btn icon-only" id="zoom-out-btn" type="button" title="Zoom out code (Ctrl+-)" aria-label="Zoom out">
       <i class="fa-solid fa-magnifying-glass-minus"></i>
     </button>
-    <span class="zoom-level" id="zoom-level" aria-live="polite">100%</span>
+    <span class="zoom-level" id="zoom-level">100%</span>
     <button class="tb-btn icon-only" id="zoom-in-btn" type="button" title="Zoom in code (Ctrl+=)" aria-label="Zoom in">
       <i class="fa-solid fa-magnifying-glass-plus"></i>
     </button>
@@ -166,6 +294,21 @@
   <button class="tb-btn icon-only" id="theme-toggle" title="Toggle dark / light theme">
     <i class="fa-solid fa-sun" id="theme-icon"></i>
   </button>
+  <div class="tb-sep"></div>
+
+  <!-- ===== Login / Logout control (added) ===== -->
+  <div id="auth-area">
+    <button class="tb-btn" id="login-btn" title="Login">
+      <i class="fa-solid fa-user"></i><span>Login</span>
+    </button>
+    <div id="user-chip">
+      <div id="user-avatar"><i class="fa-solid fa-user"></i></div>
+      <span id="user-name"></span>
+      <button class="tb-btn icon-only" id="logout-btn" title="Logout">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
+    </div>
+  </div>
 </div>
 
 <div id="app">
@@ -297,6 +440,24 @@
         </a>
     </div>
 </div>
+
+<!-- ===== Guest login modal (added) ===== -->
+<div id="login-modal-overlay">
+  <div id="login-modal">
+    <button id="login-modal-close" title="Close">&times;</button>
+    <div class="login-modal-icon"><i class="fa-solid fa-user"></i></div>
+    <h3>Login required</h3>
+    <p id="login-modal-msg">Enter your name to continue.</p>
+    <form id="login-form">
+      <input type="text" id="login-name-input" placeholder="Your name" autocomplete="off" maxlength="40">
+      <button type="submit" id="login-submit-btn">
+        <i class="fa-solid fa-right-to-bracket"></i> Login
+      </button>
+      <div id="login-error"></div>
+    </form>
+  </div>
+</div>
+
 <script src="backend/app.js"></script>
 <script src="js/c_autocom.js"></script>
 
@@ -394,6 +555,125 @@
     applyEditorZoom();
   }
   start();
+})();
+</script>
+
+<!-- ===== Guest login gating logic (added, no account or ID needed) ===== -->
+<script>
+(function () {
+  // Only the "New" button requires login. Dropdown examples stay free for everyone.
+  // This is a lightweight "guest" login: type a name, click Login, it's remembered
+  // on this device (localStorage) until Logout is clicked. No account, no ID, no backend.
+
+  const STORAGE_KEY = 'cvp_user';
+  let pendingAction = null; // { type: 'new' }
+
+  function getStoredUser() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); }
+    catch (e) { return null; }
+  }
+  function setStoredUser(u) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+  }
+  function clearStoredUser() {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  function initials(name) {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  function updateAuthUI() {
+    const user = getStoredUser();
+    const loginBtn = document.getElementById('login-btn');
+    const userChip = document.getElementById('user-chip');
+    if (user) {
+      loginBtn.style.display = 'none';
+      userChip.style.display = 'flex';
+      document.getElementById('user-avatar').textContent = initials(user.name);
+      document.getElementById('user-name').textContent = user.name;
+    } else {
+      loginBtn.style.display = 'inline-flex';
+      userChip.style.display = 'none';
+    }
+  }
+
+  function openLoginModal(msg) {
+    document.getElementById('login-modal-msg').textContent =
+      msg || 'Enter your name to continue.';
+    document.getElementById('login-error').textContent = '';
+    const input = document.getElementById('login-name-input');
+    input.value = '';
+    document.getElementById('login-modal-overlay').style.display = 'flex';
+    setTimeout(function () { input.focus(); }, 50);
+  }
+
+  function closeLoginModal() {
+    document.getElementById('login-modal-overlay').style.display = 'none';
+    pendingAction = null;
+  }
+
+  function completeLogin(name) {
+    const user = { name: name, loggedInAt: new Date().toISOString() };
+    setStoredUser(user);
+    updateAuthUI();
+    document.getElementById('login-modal-overlay').style.display = 'none';
+
+    if (pendingAction) {
+      if (pendingAction.type === 'new') {
+        const clearBtn = document.getElementById('clear-btn');
+        const ev = new Event('click', { bubbles: true });
+        ev.__authorized = true;
+        clearBtn.dispatchEvent(ev);
+      }
+      pendingAction = null;
+    }
+  }
+
+  window.addEventListener('load', function () {
+    updateAuthUI();
+
+    document.getElementById('login-btn').addEventListener('click', function () {
+      openLoginModal('Enter your name to continue.');
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', function () {
+      clearStoredUser();
+      updateAuthUI();
+    });
+
+    document.getElementById('login-modal-close').addEventListener('click', closeLoginModal);
+    document.getElementById('login-modal-overlay').addEventListener('click', function (e) {
+      if (e.target === this) closeLoginModal();
+    });
+
+    document.getElementById('login-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const name = document.getElementById('login-name-input').value.trim();
+      if (!name) {
+        document.getElementById('login-error').textContent = 'Please enter your name.';
+        return;
+      }
+      completeLogin(name);
+    });
+
+    // Dropdown examples are free for everyone — no login gate.
+
+    // Gate: "New" button — the only thing that requires login
+    const clearBtn = document.getElementById('clear-btn');
+    clearBtn.addEventListener('click', function (e) {
+      if (e.__authorized) return; // programmatic replay after successful login
+      if (!getStoredUser()) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        pendingAction = { type: 'new' };
+        openLoginModal('Enter your name to start a new file.');
+      }
+    }, true); // capture phase: runs before app.js's own listener
+  });
 })();
 </script>
 </body>
