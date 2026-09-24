@@ -527,10 +527,19 @@
   // Real OAuth 2.0 Client ID from Google Cloud Console (project: c-visualizer-plus-509609)
   const GOOGLE_CLIENT_ID = "914447538364-gsvj6ku24fml2tm7ubio3b54t4v4qm93.apps.googleusercontent.com";
 
-  // Only the "New" button requires login. Dropdown examples stay free for everyone.
+  // Dropdown examples: FREE for "Full Demo Code", "Basics", "Control Flow" — everything else needs login.
+  const FREE_VALUES = [
+    // Full Demo Code
+    'all_topics', 'memory_layout',
+    // Basics
+    'hello', 'variables', 'const', 'global_var', 'arithmetic',
+    // Control Flow
+    'if_else', 'for_loop', 'nested_for_loop', 'pattern',
+    'while_loop', 'do_while', 'switch_case'
+  ];
 
   const STORAGE_KEY = 'cvp_user';
-  let pendingAction = null; // { type: 'new' }
+  let pendingAction = null; // { type: 'sample', value } | { type: 'new' }
 
   function getStoredUser() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); }
@@ -602,7 +611,13 @@
     document.getElementById('login-modal-overlay').style.display = 'none';
 
     if (pendingAction) {
-      if (pendingAction.type === 'new') {
+      if (pendingAction.type === 'sample') {
+        const sel = document.getElementById('sample-sel');
+        sel.value = pendingAction.value;
+        const ev = new Event('change', { bubbles: true });
+        ev.__authorized = true;
+        sel.dispatchEvent(ev);
+      } else if (pendingAction.type === 'new') {
         const clearBtn = document.getElementById('clear-btn');
         const ev = new Event('click', { bubbles: true });
         ev.__authorized = true;
@@ -655,6 +670,20 @@
     });
 
     // Dropdown examples are free for everyone — no login gate.
+
+    // Gate: dropdown selection — free categories bypass, everything else needs login
+    const sampleSel = document.getElementById('sample-sel');
+    sampleSel.addEventListener('change', function (e) {
+      if (e.__authorized) return; // programmatic replay after successful login
+      const val = this.value;
+      if (val && FREE_VALUES.indexOf(val) === -1 && !getStoredUser()) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        pendingAction = { type: 'sample', value: val };
+        this.value = '';
+        openLoginModal('Sign in with Google to access this example.');
+      }
+    }, true); // capture phase: runs before app.js's own listener
 
     // Gate: "New" button — the only thing that requires login
     const clearBtn = document.getElementById('clear-btn');
