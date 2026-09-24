@@ -16,7 +16,103 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
 <link rel="stylesheet" href="css/styles.css">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+<!-- ===== Google Identity Services (real login, client-side, no backend/database) ===== -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<style>
+  /* ===== Auth UI styles (added) ===== */
+  :root{
+    --cvp-modal-bg:#1e1e2e;
+    --cvp-modal-fg:#f2f2f5;
+    --cvp-modal-border:#3a3a4a;
+    --cvp-accent:#4285F4;
+  }
+  #auth-area{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  #user-chip{
+    display:none;
+    align-items:center;
+    gap:6px;
+    padding:2px 6px 2px 2px;
+    border-radius:20px;
+    background:rgba(255,255,255,0.08);
+  }
+  #user-avatar{
+    width:26px;height:26px;border-radius:50%;
+    object-fit:cover;
+    border:1px solid rgba(255,255,255,0.35);
+    background:#555;
+    flex-shrink:0;
+  }
+  #user-name{
+    font-size:13px;
+    max-width:130px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  #logout-btn{margin-left:2px;}
+
+  #login-modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.55);
+    z-index:9999;
+    align-items:center;
+    justify-content:center;
+  }
+  #login-modal{
+    background:var(--cvp-modal-bg);
+    color:var(--cvp-modal-fg);
+    border:1px solid var(--cvp-modal-border);
+    border-radius:14px;
+    padding:32px 28px 26px;
+    width:340px;
+    max-width:90vw;
+    text-align:center;
+    box-shadow:0 20px 60px rgba(0,0,0,0.55);
+    position:relative;
+    font-family:'Inter',sans-serif;
+  }
+  #login-modal-close{
+    position:absolute;
+    top:10px;right:12px;
+    background:none;
+    border:none;
+    color:var(--cvp-modal-fg);
+    font-size:20px;
+    line-height:1;
+    cursor:pointer;
+    opacity:0.6;
+  }
+  #login-modal-close:hover{opacity:1;}
+  .login-modal-icon{
+    font-size:34px;
+    color:var(--cvp-accent);
+    margin-bottom:10px;
+  }
+  #login-modal h3{
+    margin:4px 0 8px;
+    font-size:18px;
+    font-weight:600;
+  }
+  #login-modal p{
+    font-size:13px;
+    opacity:0.8;
+    margin-bottom:20px;
+    line-height:1.45;
+  }
+  #g_id_signin_container{
+    display:flex;
+    justify-content:center;
+    min-height:44px;
+  }
+</style>
 </head>
   
 <body> 
