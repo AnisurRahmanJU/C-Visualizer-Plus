@@ -17,6 +17,9 @@
 <link rel="stylesheet" href="css/styles.css">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 
+<!-- ===== Google Identity Services (real login, client-side, no backend/database) ===== -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
 <style>
   /* ===== Auth UI styles (added) ===== */
   :root{
@@ -40,11 +43,9 @@
   }
   #user-avatar{
     width:26px;height:26px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
+    object-fit:cover;
     border:1px solid rgba(255,255,255,0.35);
-    background:var(--cvp-accent);
-    color:#fff;
-    font-size:12px;
+    background:#555;
     flex-shrink:0;
   }
   #user-name{
@@ -106,42 +107,10 @@
     margin-bottom:20px;
     line-height:1.45;
   }
-  #login-name-input{
-    width:100%;
-    box-sizing:border-box;
-    padding:11px 14px;
-    border-radius:8px;
-    border:1px solid var(--cvp-modal-border);
-    background:rgba(255,255,255,0.06);
-    color:var(--cvp-modal-fg);
-    font-size:14px;
-    font-family:'Inter',sans-serif;
-    margin-bottom:14px;
-    outline:none;
-  }
-  #login-name-input:focus{border-color:var(--cvp-accent);}
-  #login-submit-btn{
-    width:100%;
-    padding:11px 14px;
-    border-radius:8px;
-    border:none;
-    background:var(--cvp-accent);
-    color:#fff;
-    font-size:14px;
-    font-weight:600;
-    font-family:'Inter',sans-serif;
-    cursor:pointer;
+  #g_id_signin_container{
     display:flex;
-    align-items:center;
     justify-content:center;
-    gap:8px;
-  }
-  #login-submit-btn:hover{filter:brightness(1.08);}
-  #login-error{
-    color:#ff6b6b;
-    font-size:12px;
-    margin-top:8px;
-    min-height:14px;
+    min-height:44px;
   }
 </style>
 </head>
@@ -298,13 +267,13 @@
 
   <!-- ===== Login / Logout control (added) ===== -->
   <div id="auth-area">
-    <button class="tb-btn" id="login-btn" title="Login">
-      <i class="fa-solid fa-user"></i><span>Login</span>
+    <button class="tb-btn" id="login-btn" title="Sign in with Google">
+      <i class="fa-brands fa-google"></i><span>Sign In</span>
     </button>
     <div id="user-chip">
-      <div id="user-avatar"><i class="fa-solid fa-user"></i></div>
+      <img id="user-avatar" src="" alt="">
       <span id="user-name"></span>
-      <button class="tb-btn icon-only" id="logout-btn" title="Logout">
+      <button class="tb-btn icon-only" id="logout-btn" title="Sign out">
         <i class="fa-solid fa-right-from-bracket"></i>
       </button>
     </div>
@@ -441,20 +410,14 @@
     </div>
 </div>
 
-<!-- ===== Guest login modal (added) ===== -->
+<!-- ===== Google Sign-In modal (added) ===== -->
 <div id="login-modal-overlay">
   <div id="login-modal">
     <button id="login-modal-close" title="Close">&times;</button>
-    <div class="login-modal-icon"><i class="fa-solid fa-user"></i></div>
-    <h3>Login required</h3>
-    <p id="login-modal-msg">Enter your name to continue.</p>
-    <form id="login-form">
-      <input type="text" id="login-name-input" placeholder="Your name" autocomplete="off" maxlength="40">
-      <button type="submit" id="login-submit-btn">
-        <i class="fa-solid fa-right-to-bracket"></i> Login
-      </button>
-      <div id="login-error"></div>
-    </form>
+    <div class="login-modal-icon"><i class="fa-brands fa-google"></i></div>
+    <h3>Sign in required</h3>
+    <p id="login-modal-msg">Sign in with Google to start a new file.</p>
+    <div id="g_id_signin_container"></div>
   </div>
 </div>
 
@@ -558,12 +521,13 @@
 })();
 </script>
 
-<!-- ===== Guest login gating logic (added, no account or ID needed) ===== -->
+<!-- ===== Google login gating logic (added) ===== -->
 <script>
 (function () {
+  // Real OAuth 2.0 Client ID from Google Cloud Console (project: c-visualizer-plus-509609)
+  const GOOGLE_CLIENT_ID = "914447538364-gsvj6ku24fml2tm7ubio3b54t4v4qm93.apps.googleusercontent.com";
+
   // Only the "New" button requires login. Dropdown examples stay free for everyone.
-  // This is a lightweight "guest" login: type a name, click Login, it's remembered
-  // on this device (localStorage) until Logout is clicked. No account, no ID, no backend.
 
   const STORAGE_KEY = 'cvp_user';
   let pendingAction = null; // { type: 'new' }
@@ -579,11 +543,17 @@
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  function initials(name) {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return '?';
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[1][0]).toUpperCase();
+  function parseJwt(token) {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64).split('').map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) { return null; }
   }
 
   function updateAuthUI() {
@@ -593,8 +563,8 @@
     if (user) {
       loginBtn.style.display = 'none';
       userChip.style.display = 'flex';
-      document.getElementById('user-avatar').textContent = initials(user.name);
-      document.getElementById('user-name').textContent = user.name;
+      document.getElementById('user-avatar').src = user.picture || '';
+      document.getElementById('user-name').textContent = user.name || user.email || 'Signed in';
     } else {
       loginBtn.style.display = 'inline-flex';
       userChip.style.display = 'none';
@@ -603,12 +573,18 @@
 
   function openLoginModal(msg) {
     document.getElementById('login-modal-msg').textContent =
-      msg || 'Enter your name to continue.';
-    document.getElementById('login-error').textContent = '';
-    const input = document.getElementById('login-name-input');
-    input.value = '';
+      msg || 'Please sign in with Google to continue.';
     document.getElementById('login-modal-overlay').style.display = 'flex';
-    setTimeout(function () { input.focus(); }, 50);
+    try {
+      if (window.google && google.accounts && google.accounts.id) {
+        const container = document.getElementById('g_id_signin_container');
+        container.innerHTML = '';
+        google.accounts.id.renderButton(container, {
+          theme: 'outline', size: 'large', type: 'standard', shape: 'pill'
+        });
+        google.accounts.id.prompt();
+      }
+    } catch (e) { console.error('Google Sign-In error:', e); }
   }
 
   function closeLoginModal() {
@@ -616,8 +592,11 @@
     pendingAction = null;
   }
 
-  function completeLogin(name) {
-    const user = { name: name, loggedInAt: new Date().toISOString() };
+  function handleCredentialResponse(response) {
+    const payload = parseJwt(response.credential);
+    if (!payload) return;
+
+    const user = { name: payload.name, email: payload.email, picture: payload.picture };
     setStoredUser(user);
     updateAuthUI();
     document.getElementById('login-modal-overlay').style.display = 'none';
@@ -632,32 +611,47 @@
       pendingAction = null;
     }
   }
+  // Exposed for the Google Identity Services callback
+  window.handleCredentialResponse = handleCredentialResponse;
+
+  function initGoogle() {
+    if (window.google && google.accounts && google.accounts.id) {
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+        auto_select: false,
+        cancel_on_tap_outside: true
+      });
+      return true;
+    }
+    return false;
+  }
+
+  function waitForGoogle(retries) {
+    if (initGoogle()) return;
+    if (retries <= 0) return;
+    setTimeout(function () { waitForGoogle(retries - 1); }, 150);
+  }
 
   window.addEventListener('load', function () {
     updateAuthUI();
+    waitForGoogle(40); // GIS script loads async/defer, so poll briefly
 
     document.getElementById('login-btn').addEventListener('click', function () {
-      openLoginModal('Enter your name to continue.');
+      openLoginModal('Sign in with Google to unlock all features.');
     });
 
     document.getElementById('logout-btn').addEventListener('click', function () {
       clearStoredUser();
       updateAuthUI();
+      if (window.google && google.accounts && google.accounts.id) {
+        google.accounts.id.disableAutoSelect();
+      }
     });
 
     document.getElementById('login-modal-close').addEventListener('click', closeLoginModal);
     document.getElementById('login-modal-overlay').addEventListener('click', function (e) {
       if (e.target === this) closeLoginModal();
-    });
-
-    document.getElementById('login-form').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const name = document.getElementById('login-name-input').value.trim();
-      if (!name) {
-        document.getElementById('login-error').textContent = 'Please enter your name.';
-        return;
-      }
-      completeLogin(name);
     });
 
     // Dropdown examples are free for everyone — no login gate.
@@ -670,7 +664,7 @@
         e.preventDefault();
         e.stopImmediatePropagation();
         pendingAction = { type: 'new' };
-        openLoginModal('Enter your name to start a new file.');
+        openLoginModal('Sign in with Google to start a new file.');
       }
     }, true); // capture phase: runs before app.js's own listener
   });
