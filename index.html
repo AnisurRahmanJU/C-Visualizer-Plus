@@ -16,10 +16,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
 <link rel="stylesheet" href="css/styles.css">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+<!-- ===== Google Identity Services (real login, client-side, no backend/database) ===== -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <style>
-  /* ==== Google Auth UI styles (added) ===== */
+  /* ===== Auth UI styles (added) ===== */
   :root{
     --cvp-modal-bg:#1e1e2e;
     --cvp-modal-fg:#f2f2f5;
@@ -123,7 +125,7 @@
   <div class="sample-group">
     <label><i class="fa-solid fa-folder-open"></i></label>
     <select class="vsc-select" id="sample-sel">
-      <option value="">Pick an Example</option>
+      <option value="">Supported Examples</option>
       <optgroup label="Full Demo Code">
         <option value="all_topics">All Topics Covered</option>
         <option value="memory_layout">Full Memory Layout</option>
@@ -238,7 +240,7 @@
     </select>
   </div>
   <div class="tb-sep"></div>
-  <button class="tb-btn" id="clear-btn" title="Clear editor">
+  <button class="tb-btn" id="clear-btn" title="Write a new code">
     <i class="fa-solid fa-file-circle-plus"></i><span>Write a new code</span>
   </button>
   <div class="zoom-group" aria-label="Editor zoom controls">
@@ -522,8 +524,8 @@
 <!-- ===== Google login gating logic (added) ===== -->
 <script>
 (function () {
-  // Real OAuth 2.0 Client ID from Google Cloud Console (project: c-visualizer-plus-509609)
-  const GOOGLE_CLIENT_ID = "914447538364-gsvj6ku24fml2tm7ubio3b54t4v4qm93.apps.googleusercontent.com";
+  // Real OAuth 2.0 Client ID from Google Cloud Console
+  const GOOGLE_CLIENT_ID = "67521400455-0bt9eptaruohutmhnmlo4mpbm4lj6dqt.apps.googleusercontent.com";
 
   // Dropdown examples: FREE for "Full Demo Code", "Basics", "Control Flow" — everything else needs login.
   const FREE_VALUES = [
@@ -691,7 +693,7 @@
         e.preventDefault();
         e.stopImmediatePropagation();
         pendingAction = { type: 'new' };
-        openLoginModal('Sign in with Google to start a new file.');
+        openLoginModal('Sign in with Google to write a new code.');
       }
     }, true); // capture phase: runs before app.js's own listener
   });
