@@ -657,6 +657,7 @@
     });
 
     document.getElementById('logout-btn').addEventListener('click', function () {
+      if (!confirm('Do you want to logout?')) return;
       clearStoredUser();
       updateAuthUI();
       if (window.google && google.accounts && google.accounts.id) {
