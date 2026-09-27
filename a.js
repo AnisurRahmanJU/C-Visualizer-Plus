@@ -1,3 +1,15 @@
+  <div class="tb-spacer"></div>
+  <button class="tb-btn" id="direct-run-btn" title="Run the code directly, like a compiler">
+    <i class="fa-solid fa-bolt"></i><span>Run</span>
+  </button>
+  <button class="tb-btn primary" id="run-btn">
+    <i class="fa-solid fa-play"></i><span>Visualize</span>
+  </button>
+
+
+
+
+
 function runVisualize() {
   stopPlay();
   const code = cmEditor.getValue().trim();
