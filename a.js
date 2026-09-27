@@ -32,3 +32,11 @@ function runDirect() {
     setStatus('error', 'Error');
   }
 }
+
+
+<button class="tb-btn primary" id="direct-run-btn" title="Compile & run directly — shows final output only, no stepping">
+    <i class="fa-solid fa-play"></i><span>Run</span>
+  </button>
+  <button class="tb-btn" id="run-btn" title="Step through execution line-by-line">
+    <i class="fa-solid fa-shoe-prints"></i><span>Visualize</span>
+  </button>
