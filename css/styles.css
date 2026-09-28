@@ -307,3 +307,23 @@ circle.graph-node-current + text.graph-node-label{fill:#e2691a !important;}
     #viz-panel{padding:10px;}
     #viz-grid{gap:10px;}
 }
+
+/* ══ OUTPUT HORIZONTAL SCROLL — force override (beats inline / injected styles) ══ */
+#output-area,
+#output-area * {
+    white-space: pre !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    word-wrap: normal !important;
+}
+#output-area {
+    display: block !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+}
+#card-output .viz-card-body {
+    overflow-x: auto;
+    min-width: 0;
+}
